@@ -40,11 +40,17 @@ class CommandResult(BaseModel):
 
 
 async def _resolve_and_check_pc(session: AsyncSession, settings: Settings, pc_id: str) -> Pc | None:
-    pc = await _resolve_pc(session, pc_id)
-    if pc is not None:
-        if pc.status != PcStatus.ACTIVE:
-            raise AppError("PC_NOT_ACTIVE", f"PC is in '{pc.status}' status", 409)
-        return pc
+    pc = None
+    try:
+        pc = await _resolve_pc(session, pc_id)
+        if pc is not None:
+            if pc.status != PcStatus.ACTIVE:
+                raise AppError("PC_NOT_ACTIVE", f"PC is in '{pc.status}' status", 409)
+            return pc
+    except AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("PC %s: DB lookup bypassed in dev mode: %s", pc_id, exc)
 
     if settings.environment != "dev":
         raise AppError("PC_NOT_FOUND", f"PC '{pc_id}' not found", 404)

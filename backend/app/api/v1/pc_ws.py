@@ -68,7 +68,12 @@ async def pc_websocket(
     # ------------------------------------------------------------------
     # 2. Validate the PC exists in DB (or allow in dev mode)
     # ------------------------------------------------------------------
-    pc = await _resolve_pc(session, pc_key)
+    pc = None
+    try:
+        pc = await _resolve_pc(session, pc_key)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("PC %s: DB lookup bypassed in dev mode: %s", pc_key, exc)
+
     if pc is not None and pc.status == PcStatus.RETIRED:
         await ws.close(code=4004, reason="pc_retired")
         return
