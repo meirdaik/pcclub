@@ -353,6 +353,74 @@ export default function PcControlModal({
               </div>
             </div>
 
+            {/* BIOS & Anti-Cheat Security Inspector */}
+            <div style={styles.securityBox}>
+              <div style={styles.sectionHeader}>BIOS / UEFI & ANTI-CHEAT SECURITY STATUS</div>
+              <div style={styles.secGrid}>
+                <div style={styles.secCard}>
+                  <div style={styles.secLabel}>UEFI SECURE BOOT</div>
+                  <div
+                    style={{
+                      ...styles.secVal,
+                      color:
+                        pc.security?.secureBoot === 'ENABLED'
+                          ? '#00ff88'
+                          : pc.security?.secureBoot === 'DISABLED'
+                          ? '#ff0055'
+                          : '#ffea00',
+                    }}
+                  >
+                    {pc.security?.secureBoot === 'ENABLED'
+                      ? '🛡️ ACTIVE (ENABLED)'
+                      : pc.security?.secureBoot === 'DISABLED'
+                      ? '⚠️ OFF (DISABLED)'
+                      : '⚙️ LEGACY / UNSUPPORTED'}
+                  </div>
+                </div>
+
+                <div style={styles.secCard}>
+                  <div style={styles.secLabel}>TPM 2.0 SECURITY CHIP</div>
+                  <div
+                    style={{
+                      ...styles.secVal,
+                      color: pc.security?.tpmPresent ? '#00f0ff' : '#ff0055',
+                    }}
+                  >
+                    {pc.security?.tpmPresent ? '🔒 PRESENT & READY' : '❌ NOT DETECTED'}
+                  </div>
+                </div>
+
+                <div style={styles.secCard}>
+                  <div style={styles.secLabel}>ANTI-CHEAT READINESS</div>
+                  <div
+                    style={{
+                      ...styles.secVal,
+                      color: pc.security?.antiCheatReady ? '#00ff88' : '#ffea00',
+                    }}
+                  >
+                    {pc.security?.antiCheatReady ? '⚡ FACEIT & VANGUARD READY' : '⚠️ CHECK FIRMWARE'}
+                  </div>
+                </div>
+
+                <div style={styles.secCard}>
+                  <div style={styles.secLabel}>MOTHERBOARD BIOS S/N</div>
+                  <div style={styles.secValCode}>{pc.security?.biosSerial || 'UNKNOWN'}</div>
+                </div>
+
+                <div style={styles.secCardFull}>
+                  <div style={styles.secLabel}>HARDWARE UUID (HWID)</div>
+                  <div style={styles.secValCode}>{pc.security?.hwUuid || 'UNKNOWN'}</div>
+                </div>
+
+                {pc.mac_address && (
+                  <div style={styles.secCardFull}>
+                    <div style={styles.secLabel}>PRIMARY NETWORK MAC ADDRESS (WoL)</div>
+                    <div style={styles.secValCode}>{pc.mac_address}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Remote Power Management */}
             <div style={styles.remotePowerBox}>
               <div style={styles.sectionHeader}>REMOTE POWER MANAGEMENT</div>
@@ -677,6 +745,50 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-muted)',
     fontStyle: 'italic',
     padding: '6px 0',
+  },
+  securityBox: {
+    backgroundColor: '#070913',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: '10px',
+    padding: '14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  secGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '10px',
+  },
+  secCard: {
+    backgroundColor: '#0d1226',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+    borderRadius: '8px',
+    padding: '10px',
+  },
+  secCardFull: {
+    gridColumn: '1 / -1',
+    backgroundColor: '#0d1226',
+    border: '1px solid rgba(255, 255, 255, 0.05)',
+    borderRadius: '8px',
+    padding: '10px',
+  },
+  secLabel: {
+    fontSize: '10px',
+    color: 'var(--text-muted)',
+    fontWeight: 'bold',
+    letterSpacing: '0.6px',
+    marginBottom: '4px',
+  },
+  secVal: {
+    fontSize: '12px',
+    fontWeight: 'bold',
+  },
+  secValCode: {
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    color: '#00f0ff',
+    wordBreak: 'break-all',
   },
   remotePowerBox: {
     borderTop: '1px solid var(--border-subtle)',

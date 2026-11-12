@@ -14,6 +14,16 @@ export interface ProcessItem {
   memoryMb?: number;
 }
 
+export interface BiosSecurityInfo {
+  secureBoot: 'ENABLED' | 'DISABLED' | 'UNSUPPORTED';
+  tpmPresent: boolean;
+  biosSerial: string;
+  hwUuid: string;
+  vanguardInstalled: boolean;
+  faceitInstalled: boolean;
+  antiCheatReady: boolean;
+}
+
 export interface ClubPc {
   id: string;
   pc_id: string;
@@ -34,6 +44,7 @@ export interface ClubPc {
   power_plan?: string;
   maintenance_mode?: boolean;
   mac_address?: string;
+  security?: BiosSecurityInfo;
   last_heartbeat?: number;
 }
 

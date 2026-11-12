@@ -117,6 +117,16 @@ export interface AppConfig {
   authToken: string;
 }
 
+export interface BiosSecurityInfo {
+  secureBoot: 'ENABLED' | 'DISABLED' | 'UNSUPPORTED';
+  tpmPresent: boolean;
+  biosSerial: string;
+  hwUuid: string;
+  vanguardInstalled: boolean;
+  faceitInstalled: boolean;
+  antiCheatReady: boolean;
+}
+
 export interface ElectronAPI {
   getConfig: () => Promise<AppConfig>;
   launchApp: (exePathOrUri: string) => Promise<{ success: boolean; error?: string }>;
@@ -134,6 +144,7 @@ export interface ElectronAPI {
     processes: Array<{ name: string; pid: number; memoryMb: number }>;
     mac_address: string;
     maintenance_mode: boolean;
+    security?: BiosSecurityInfo;
   }>;
   setPowerPlan?: (plan: string) => Promise<{ success: boolean; plan: string; message: string }>;
   killProcess?: (payload: { pid?: number; name?: string }) => Promise<{ success: boolean; error?: string }>;
