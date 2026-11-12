@@ -5,7 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc && vite build && tsc -p tsconfig.electron.json",
+    "build": "tsc && vite build && tsc -p tsconfig.electron.json && node -e \"require('fs').copyFileSync('electron/keyBlocker.exe', 'dist-electron/keyBlocker.exe')\"",
     "preview": "vite preview --host 0.0.0.0",
     "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "dist": "npm run build && electron-builder --win",
@@ -46,6 +46,10 @@
       {
         "from": "config.json",
         "to": "config.json"
+      },
+      {
+        "from": "dist-electron/keyBlocker.exe",
+        "to": "keyBlocker.exe"
       }
     ],
     "win": {

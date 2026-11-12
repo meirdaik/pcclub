@@ -1041,12 +1041,13 @@ app.whenReady().then(() => {
   if (fs.existsSync(flagPath)) {
     isMaintenanceMode = true;
     console.log('[SENET Startup] Maintenance mode flag detected, skipping shell takeover.');
-  } else if (!isWindowed && !isDev) {
-    console.log('[SENET Startup] Kiosk mode: executing explorer.exe takeover and registry lockdown...');
+  } else if (!isWindowed) {
+    console.log('[SENET Startup] Kiosk mode: executing explorer & Start menu takeover, key blocker, and registry lockdown...');
     shellManager.killExplorer();
     applyRegistryLockdown(true);
   } else {
-    console.log('[SENET Startup] Running in windowed/dev mode: skipping explorer.exe termination.');
+    console.log('[SENET Startup] Running in windowed test mode: activating hardware Win-key blocker...');
+    shellManager.enableKeyBlocker();
   }
 
   // Aggressive focus loop when locked
@@ -1087,6 +1088,8 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   applyRegistryLockdown(false);
+  shellManager.disableKeyBlocker();
+  shellManager.restoreExplorer();
 });
 
 app.on('window-all-closed', () => {
