@@ -1,8 +1,8 @@
 {
-  "serverIp": "127.0.0.1",
+  "serverIp": "10.72.161.182",
   "serverPort": 8000,
-  "pcId": "pc-001",
-  "pcNumber": 1,
-  "pcLabel": "PC #1",
+  "pcId": "pc-002",
+  "pcNumber": 2,
+  "pcLabel": "PC #2",
   "authToken": "dev-pc-token"
 }
