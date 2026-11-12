@@ -8,7 +8,10 @@
     "build": "tsc && vite build && tsc -p tsconfig.electron.json",
     "preview": "vite preview",
     "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder --win",
+    "dist:portable": "npm run build && electron-builder --win portable",
+    "dist:dir": "npm run build && electron-builder --dir",
+    "electron:build": "npm run dist"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -32,8 +35,23 @@
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "config.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "config.json",
+        "to": "config.json"
+      }
+    ],
     "win": {
-      "target": "nsis"
+      "target": [
+        "portable",
+        "zip"
+      ],
+      "signAndEditExecutable": false
     }
   }
 }
