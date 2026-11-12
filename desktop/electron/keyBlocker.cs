@@ -7,11 +7,6 @@ using System.Threading;
 namespace PCClubSecurity {
     static class KeyBlocker {
         private const int WH_KEYBOARD_LL = 13;
-        private const int WM_KEYDOWN = 0x0100;
-        private const int WM_KEYUP = 0x0101;
-        private const int WM_SYSKEYDOWN = 0x0104;
-        private const int WM_SYSKEYUP = 0x0105;
-
         private const int VK_TAB = 0x09;
         private const int VK_ESCAPE = 0x1B;
         private const int VK_F4 = 0x73;
@@ -31,8 +26,20 @@ namespace PCClubSecurity {
         private static IntPtr _hookID = IntPtr.Zero;
 
         [STAThread]
-        public static void Main() {
-            // Listen on stdin for "exit" or "quit" in a background thread
+        public static void Main(string[] args) {
+            // 1. If parent PID is passed, exit automatically when parent process dies
+            int parentPid = 0;
+            if (args.Length > 0 && int.TryParse(args[0], out parentPid) && parentPid > 0) {
+                new Thread(() => {
+                    try {
+                        Process parent = Process.GetProcessById(parentPid);
+                        parent.WaitForExit();
+                    } catch {}
+                    Application.Exit();
+                }) { IsBackground = true }.Start();
+            }
+
+            // 2. Listen on stdin for "exit" or "quit"
             new Thread(() => {
                 try {
                     string line;

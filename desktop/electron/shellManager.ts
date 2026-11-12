@@ -51,7 +51,7 @@ class SystemShellManager {
 
     try {
       console.log(`[SystemShellManager] Activating Low-Level Windows Key Blocker: ${exePath}`);
-      this._keyBlockerProc = spawn(exePath, [], {
+      this._keyBlockerProc = spawn(exePath, [String(process.pid)], {
         detached: false,
         stdio: ['pipe', 'ignore', 'ignore'],
         windowsHide: true,
