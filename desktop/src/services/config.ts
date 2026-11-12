@@ -1,10 +1,10 @@
 import { AppConfig } from '../types';
 
 let cachedConfig: AppConfig = {
-  serverIp: window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '10.72.161.182',
+  serverIp: window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '127.0.0.1',
   serverPort: 8000,
-  serverUrl: `http://${window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '10.72.161.182'}:8000`,
-  wsUrl: `ws://${window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '10.72.161.182'}:8000`,
+  serverUrl: `http://${window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '127.0.0.1'}:8000`,
+  wsUrl: `ws://${window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : '127.0.0.1'}:8000`,
   pcId: 'pc-002',
   pcNumber: 2,
   pcLabel: 'PC #2',

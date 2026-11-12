@@ -1,35 +1,75 @@
 @echo off
-title PC Club Unified Ecosystem Launcher
+title PC Club Unified Ecosystem (LAN and Dev Launcher)
 color 0b
+
 echo ============================================================
-echo       PC CLUB ECOSYSTEM - UNIFIED ONE-CLICK LAUNCH
-echo ============================================================
-echo  [1/3] Launching FastAPI Backend Server on 0.0.0.0:8000...
-echo  [2/3] Launching Cashier Admin Console on port 5174...
-echo  [3/3] Launching Player Gaming Client Kiosk on port 5173...
+echo       PC CLUB ECOSYSTEM - UNIFIED LAN AND DEV LAUNCHER
 echo ============================================================
 
-:: 1. Start Backend in a dedicated window
-start "PC Club [Backend API Server]" cmd /k "cd /d "%~dp0backend" && .\.venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload"
+:: 1. Detect Real LAN IPv4 Address
+set LAN_IP=127.0.0.1
+for /f "tokens=*" %%a in ('backend\.venv\Scripts\python.exe -c "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('8.8.8.8', 80)); print(s.getsockname()[0]); s.close()"') do set LAN_IP=%%a
 
-:: Give backend 3 seconds to spin up and auto-seed database
-timeout /t 3 /nobreak >nul
+echo [OK] Detected Host LAN IPv4: %LAN_IP%
 
-:: 2. Start Admin Control Center
-start "PC Club [Admin Console]" cmd /k "cd /d "%~dp0admin-desktop" && npm run dev"
+:: 2. Auto-sync LAN IP to desktop/config.json
+echo [*] Syncing LAN IP to desktop/config.json
+backend\.venv\Scripts\python.exe -c "import json, os, sys; ip = sys.argv[1]; p = 'desktop/config.json'; d = json.load(open(p)) if os.path.exists(p) else {}; d['serverIp'] = ip; open(p, 'w').write(json.dumps(d, indent=2))" %LAN_IP%
 
-:: Give admin panel a moment
-timeout /t 2 /nobreak >nul
+:: 3. Launch Backend if not already listening
+netstat -ano | findstr :8000 | findstr LISTEN >nul
+if errorlevel 1 (
+    echo [*] Starting FastAPI Backend on 0.0.0.0:8000
+    start "PC Club [Backend API Server]" cmd /k "cd /d "%~dp0backend" && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    timeout /t 3 /nobreak >nul
+) else (
+    echo [OK] Backend Server is already listening on port 8000
+)
 
-:: 3. Start Player Gaming Client
-start "PC Club [Gaming Client]" cmd /k "cd /d "%~dp0desktop" && npm run dev"
+:: 4. Launch Cashier Admin Console if not already listening
+netstat -ano | findstr :5174 | findstr LISTEN >nul
+if errorlevel 1 (
+    echo [*] Starting Cashier Admin Console on port 5174
+    start "PC Club [Admin Console]" cmd /k "cd /d "%~dp0admin-desktop" && npx vite --host 0.0.0.0 --port 5174"
+    timeout /t 2 /nobreak >nul
+) else (
+    echo [OK] Cashier Admin Console is already listening on port 5174
+)
+
+:: 5. Launch Player Gaming Kiosk if not already listening
+netstat -ano | findstr :5173 | findstr LISTEN >nul
+if errorlevel 1 (
+    echo [*] Starting Player Gaming Kiosk on port 5173
+    start "PC Club [Gaming Client]" cmd /k "cd /d "%~dp0desktop" && npx vite --host 0.0.0.0 --port 5173"
+    timeout /t 2 /nobreak >nul
+) else (
+    echo [OK] Player Gaming Kiosk is already listening on port 5173
+)
 
 echo.
-echo [SUCCESS] All 3 ecosystem modules launched successfully!
+echo ============================================================
+echo   [SUCCESS] PC CLUB ECOSYSTEM READY FOR LOCAL AND LAN PLAY!
+echo ============================================================
 echo.
-echo - Backend API:        http://127.0.0.1:8000/docs
-echo - Admin Control Map:  http://localhost:5174
-echo - Player Lock Screen: http://localhost:5173
+echo   LOCAL ACCESS (On This Main PC):
+echo   ------------------------------------------------------------
+echo   * Cashier Admin Map:       http://localhost:5174
+echo   * Station #1 Web Kiosk:    http://localhost:5173
+echo   * Backend Swagger API:     http://127.0.0.1:8000/docs
 echo.
-echo Keep this window open or press any key to close launcher.
-pause >nul
+echo   LAN ACCESS (For PC #2 or Other Devices on Wi-Fi):
+echo   ------------------------------------------------------------
+echo   * Download Kiosk .EXE:     http://%LAN_IP%:8000/download/kiosk
+echo   * Web Download Portal:     http://%LAN_IP%:8000/download
+echo   * Station #2 Web Kiosk:    http://%LAN_IP%:5173/?pc_id=pc-002^&server_ip=%LAN_IP%
+echo   * Cashier Admin on LAN:    http://%LAN_IP%:5174
+echo.
+echo   LAN TROUBLESHOOTING:
+echo   1. Windows Firewall: If PC #2 cannot connect, run open-lan-firewall.bat
+echo      as Administrator.
+echo   2. University / Public Wi-Fi: If university Wi-Fi blocks LAN
+echo      communication (AP Isolation), turn on "Mobile Hotspot" in
+echo      Windows Settings and connect PC #2 to this PC's hotspot!
+echo ============================================================
+echo.
+pause

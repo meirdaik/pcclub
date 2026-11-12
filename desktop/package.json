@@ -4,9 +4,9 @@
   "description": "PC Club kiosk application for gaming PCs",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build && tsc -p tsconfig.electron.json",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0",
     "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "dist": "npm run build && electron-builder --win",
     "dist:portable": "npm run build && electron-builder --win portable",
