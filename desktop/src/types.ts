@@ -24,16 +24,52 @@ export interface ClientMessage {
 export interface GameItem {
   id: string;
   name: string;
-  category: string;
+  category: 'Popular' | 'Steam' | 'Shooter' | 'MOBA' | 'App';
   icon: string;
-  banner?: string;
   exePath: string;
+  uriScheme?: string;
+  banner?: string;
   popular?: boolean;
+  isWebEmbed?: boolean;
+  embedUrl?: string;
+}
+
+export interface CartItem {
+  id: string;
+  name: string;
+  priceKzt: number;
+  quantity: number;
+  category: string;
+  imageEmoji: string;
+}
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  category: 'Drinks' | 'Snacks' | 'Hot Meals' | 'Combos';
+  priceKzt: number;
+  imageEmoji: string;
+  description: string;
+}
+
+export interface SystemStats {
+  pcId: string;
+  pcLabel: string;
+  hostname: string;
+  osRelease: string;
+  totalMemoryGb: number;
+  freeMemoryGb: number;
+  cpuModel: string;
 }
 
 export interface ElectronAPI {
-  launchApp: (exePath: string) => Promise<{ success: boolean; error?: string }>;
+  launchApp: (exePathOrUri: string) => Promise<{ success: boolean; error?: string }>;
   getPcInfo: () => Promise<{ pcId: string; pcLabel: string }>;
+  getSystemStats: () => Promise<SystemStats>;
+  minimizeWindow: () => void;
+  restoreWindow: () => void;
+  setKioskMode: (enabled: boolean) => void;
+  openExternal: (url: string) => void;
   exitKiosk: () => void;
 }
 

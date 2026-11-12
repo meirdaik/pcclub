@@ -1,4 +1,4 @@
-"""HTTP endpoints to lock / unlock a PC via WebSocket."""
+"""HTTP endpoints to lock / unlock a PC, order food, and call administrator."""
 
 import logging
 from typing import Annotated
@@ -27,6 +27,23 @@ class UnlockRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
     password: str | None = None
     remaining_seconds: int = Field(3600, gt=0)
+
+
+class OrderItem(BaseModel):
+    name: str
+    quantity: int = 1
+    price_kzt: int
+
+
+class OrderRequest(BaseModel):
+    items: list[OrderItem]
+    total_kzt: int
+    note: str | None = None
+
+
+class CallAdminRequest(BaseModel):
+    reason: str
+    message: str | None = None
 
 
 class CommandResult(BaseModel):
@@ -80,7 +97,6 @@ async def unlock_pc(
         "remaining_seconds": body.remaining_seconds,
     }
 
-    # Attempt to send to pc_id directly or by DB UUID if available
     sent = await manager.send_command(pc_id, "UNLOCK", payload)
     if not sent and pc is not None:
         sent = await manager.send_command(str(pc.id), "UNLOCK", payload)
@@ -112,3 +128,30 @@ async def lock_pc(
 
     logger.info("PC %s: locked", pc_id)
     return CommandResult(ok=True, detail=f"LOCK sent to {pc_id}")
+
+
+@router.post("/{pc_id}/order")
+async def place_station_order(
+    pc_id: str,
+    body: OrderRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CommandResult:
+    """Player orders snacks / energy drinks delivered to their station."""
+    await _resolve_and_check_pc(session, settings, pc_id)
+    item_summary = ", ".join(f"{it.name} x{it.quantity}" for it in body.items)
+    logger.info("PC %s [BAR ORDER]: %s — Total: %d KZT (Note: %s)", pc_id, item_summary, body.total_kzt, body.note)
+    return CommandResult(ok=True, detail=f"Order received for {pc_id}. Administrator dispatched.")
+
+
+@router.post("/{pc_id}/call-admin")
+async def call_station_admin(
+    pc_id: str,
+    body: CallAdminRequest,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> CommandResult:
+    """Player alerts administrator from the kiosk dashboard."""
+    await _resolve_and_check_pc(session, settings, pc_id)
+    logger.warning("PC %s [CALL ADMIN ALERT]: Reason: %s (Msg: %s)", pc_id, body.reason, body.message)
+    return CommandResult(ok=True, detail=f"Administrator notified for {pc_id}.")
