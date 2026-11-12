@@ -12,9 +12,9 @@ for /f "tokens=*" %%a in ('backend\.venv\Scripts\python.exe -c "import socket; s
 
 echo [OK] Detected Host LAN IPv4: %LAN_IP%
 
-:: 2. Auto-sync LAN IP to desktop/config.json
-echo [*] Syncing LAN IP to desktop/config.json
-backend\.venv\Scripts\python.exe -c "import json, os, sys; ip = sys.argv[1]; p = 'desktop/config.json'; d = json.load(open(p)) if os.path.exists(p) else {}; d['serverIp'] = ip; open(p, 'w').write(json.dumps(d, indent=2))" %LAN_IP%
+:: 2. Auto-sync LAN IP to desktop/config.json and AppData
+echo [*] Syncing LAN IP to desktop/config.json and AppData...
+backend\.venv\Scripts\python.exe -c "import json, os, sys; ip = sys.argv[1]; paths = ['desktop/config.json', 'desktop/release/config.json', os.path.expandvars(r'%%APPDATA%%\pcclub-desktop\config.json')]; [open(p, 'w').write(json.dumps({**json.load(open(p)), 'serverIp': ip} if os.path.exists(p) else {'serverIp': ip, 'serverPort': 8000, 'pcId': 'pc-002', 'pcNumber': 2, 'pcLabel': 'PC #2', 'authToken': 'dev-pc-token'}, indent=2)) for p in paths if os.path.exists(os.path.dirname(p))]" %LAN_IP%
 
 :: 3. Launch Backend if not already listening
 netstat -ano | findstr :8000 | findstr LISTEN >nul

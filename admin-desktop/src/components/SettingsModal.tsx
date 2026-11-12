@@ -98,7 +98,7 @@ export default function SettingsModal({ onClose, onSaved }: SettingsModalProps) 
               className="cyber-input"
               value={serverIp}
               onChange={(e) => setServerIp(e.target.value)}
-              placeholder="e.g. 10.72.161.182 or 192.168.1.100"
+              placeholder="e.g. 10.72.49.124 or 127.0.0.1"
               required
             />
             <span style={styles.hint}>The Local IP of the main PC running the FastAPI backend.</span>

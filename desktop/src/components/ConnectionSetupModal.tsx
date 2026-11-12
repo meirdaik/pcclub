@@ -121,10 +121,42 @@ export default function ConnectionSetupModal({ onClose, onSaved }: ConnectionSet
                 className="cyber-input"
                 value={serverIp}
                 onChange={(e) => setServerIp(e.target.value)}
-                placeholder="e.g. 10.72.161.182 or 192.168.1.50"
+                placeholder="e.g. 10.72.49.124 or 127.0.0.1"
                 style={styles.input}
                 required
               />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setServerIp('10.72.49.124')}
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+                    border: '1px solid #00f0ff',
+                    borderRadius: '4px',
+                    color: '#00f0ff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⚡ Use Current LAN: 10.72.49.124
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setServerIp('127.0.0.1')}
+                  style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '4px',
+                    color: '#cbd5e1',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🖥️ Localhost (127.0.0.1)
+                </button>
+              </div>
             </div>
             <div style={{ flex: 1 }}>
               <label style={styles.label}>PORT</label>

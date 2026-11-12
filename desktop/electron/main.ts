@@ -84,7 +84,10 @@ function loadAppConfig(): RuntimeConfig {
     }
   }
 
-  const serverIp = String(rawConfig.serverIp || process.env.VITE_SERVER_IP || '127.0.0.1');
+  let serverIp = String(rawConfig.serverIp || process.env.VITE_SERVER_IP || '127.0.0.1');
+  if (serverIp === '10.72.161.182') {
+    serverIp = '10.72.49.124';
+  }
   const serverPort = Number(rawConfig.serverPort || process.env.VITE_SERVER_PORT || 8000);
 
   let pcNumber = 1;
