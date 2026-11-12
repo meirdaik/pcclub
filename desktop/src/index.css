@@ -147,6 +147,11 @@ body, html {
 }
 
 /* Cyber Input */
+input, textarea, .cyber-input {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 .cyber-input {
   background: rgba(10, 15, 30, 0.85);
   border: 1px solid var(--border-subtle);
@@ -183,4 +188,30 @@ body, html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 240, 255, 0.6);
+}
+
+/* Electron native webview support */
+webview {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1;
+  border: none;
+}
+
+/* Low-time warning pulsing glow */
+@keyframes warning-pulse {
+  0% {
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(255, 0, 85, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+  }
+}
+
+.warning-banner-pulse {
+  animation: warning-pulse 1.2s infinite ease-in-out;
 }

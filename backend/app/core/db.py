@@ -29,7 +29,10 @@ class Base(DeclarativeBase):
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    url = get_settings().database_url
+    if "sqlite" in url:
+        return create_async_engine(url, connect_args={"check_same_thread": False})
+    return create_async_engine(url, pool_pre_ping=True)
 
 
 @lru_cache
