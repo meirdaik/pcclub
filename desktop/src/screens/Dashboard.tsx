@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Play, Sparkles, Flame, Clock } from 'lucide-react';
 import { SessionInfo, GameItem, MenuItem, CartItem, SystemStats } from '../types';
 import { socketService } from '../services/socket';
 import { getAppConfig } from '../services/config';
+import GameCard3D from '../components/GameCard3D';
 
 interface DashboardProps {
   session: SessionInfo;
@@ -325,6 +327,9 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('games');
   const [isMiniHud, setIsMiniHud] = useState(false);
   const [launchToast, setLaunchToast] = useState<string | null>(null);
+  const [hoveredGame, setHoveredGame] = useState<GameItem | null>(null);
+  const [runningGameId, setRunningGameId] = useState<string | null>(null);
+  const [gameCategoryFilter, setGameCategoryFilter] = useState<string>('all');
 
   // Embedded in-system browser state
   const [browserUrl, setBrowserUrl] = useState<string>('https://www.youtube.com');
@@ -495,6 +500,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   };
 
   const handleLaunchGame = async (game: GameItem) => {
+    setRunningGameId(game.id);
     // If it's an in-system embedded web app:
     if (game.isWebEmbed && game.embedUrl) {
       setBrowserUrl(game.embedUrl);
@@ -659,19 +665,49 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
           <div style={styles.stationPill}>{pcLabel}</div>
         </div>
 
-        {/* Center Live Session Timer */}
+        {/* Center Live Session Timer with Circular Progress Ring */}
         <div style={styles.centerTimerBox}>
-          <div style={styles.timerSubtitle}>ACTIVE SESSION TIME</div>
-          <div
-            style={{
-              ...styles.timerDigits,
-              color: isLowTime ? '#ef4444' : '#00f0ff',
-              textShadow: isLowTime
-                ? '0 0 20px rgba(239, 68, 68, 0.7)'
-                : '0 0 20px rgba(0, 240, 255, 0.6)',
-            }}
-          >
-            {formatTime(secondsLeft)}
+          <div style={{ position: 'relative', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="48" height="48" style={{ transform: 'rotate(-90deg)' }}>
+              <circle
+                cx="24"
+                cy="24"
+                r="19"
+                stroke="rgba(255, 255, 255, 0.1)"
+                strokeWidth="4"
+                fill="transparent"
+              />
+              <circle
+                cx="24"
+                cy="24"
+                r="19"
+                stroke={secondsLeft < 60 ? '#ff0055' : secondsLeft < 300 ? '#ffaa00' : '#00f0ff'}
+                strokeWidth="4"
+                strokeDasharray="119.4"
+                strokeDashoffset={119.4 - (119.4 * Math.min(100, Math.max(0, (secondsLeft % 3600) / 36))) / 100}
+                strokeLinecap="round"
+                fill="transparent"
+                style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
+              />
+            </svg>
+            <Clock size={16} color={secondsLeft < 60 ? '#ff0055' : secondsLeft < 300 ? '#ffaa00' : '#00f0ff'} style={{ position: 'absolute' }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={styles.timerSubtitle}>ACTIVE SESSION TIME</div>
+            <div
+              style={{
+                ...styles.timerDigits,
+                color: secondsLeft < 60 ? '#ff0055' : secondsLeft < 300 ? '#ffaa00' : '#00f0ff',
+                textShadow: secondsLeft < 60
+                  ? '0 0 20px rgba(255, 0, 85, 0.8)'
+                  : secondsLeft < 300
+                  ? '0 0 20px rgba(255, 170, 0, 0.8)'
+                  : '0 0 20px rgba(0, 240, 255, 0.6)',
+              }}
+            >
+              {formatTime(secondsLeft)}
+            </div>
           </div>
         </div>
 
@@ -786,35 +822,109 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
 
       {/* MAIN CONTENT AREA */}
       <main style={styles.mainArea}>
-        {/* TAB 1: GAMES & LAUNCHERS */}
+        {/* TAB 1: GAMES & LAUNCHERS (3D TILT CARDS & DYNAMIC HERO BANNER) */}
         {activeTab === 'games' && (
           <div style={styles.tabPane}>
-            <div style={styles.paneHeader}>
-              <h2 className="cyber-glitch-text" style={styles.paneTitle}>
-                INSTALLED GAMES & APPLICATIONS
-              </h2>
-              <span style={styles.paneSub}>CLICK TO RUN INSTANTLY OR OPEN IN SYSTEM</span>
+            {/* Dynamic Hero Banner */}
+            {(() => {
+              const hero = hoveredGame || SENET_GAMES[1];
+              const heroImgs: Record<string, string> = {
+                cs2: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1400&q=80',
+                dota2: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1400&q=80',
+                valorant: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1400&q=80',
+                steam: 'https://images.unsplash.com/photo-1612287232049-74d6c44fa784?auto=format&fit=crop&w=1400&q=80',
+                discord: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1400&q=80',
+                youtube_app: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1400&q=80',
+              };
+              const heroBg = heroImgs[hero.id] || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1400&q=80';
+
+              return (
+                <div style={styles.heroBanner}>
+                  <div
+                    style={{
+                      ...styles.heroBannerBg,
+                      backgroundImage: `url(${heroBg})`,
+                    }}
+                  />
+                  <div style={styles.heroBannerOverlay} />
+
+                  <div style={styles.heroBannerContent}>
+                    <div style={styles.heroTagRow}>
+                      <span style={styles.heroCategoryBadge}>
+                        <Sparkles size={11} style={{ marginRight: 4 }} />
+                        {hero.category.toUpperCase()} ARENA READY
+                      </span>
+                      {hero.popular && (
+                        <span style={styles.heroHotBadge}>
+                          <Flame size={11} style={{ marginRight: 4 }} />
+                          TOP PLAYED IN CLUB
+                        </span>
+                      )}
+                    </div>
+                    <h1 style={styles.heroTitle}>{hero.name}</h1>
+                    <p style={styles.heroDesc}>
+                      Ultra-low latency competitive profile enabled. High tick-rate server optimizations active.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '14px' }}>
+                      <button
+                        onClick={() => handleLaunchGame(hero)}
+                        className="shimmer-button"
+                        style={styles.heroLaunchBtn}
+                      >
+                        <Play size={15} style={{ marginRight: 6 }} /> PLAY {hero.name.toUpperCase()}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Category Filter Bar */}
+            <div style={styles.categoryFilterBar}>
+              {[
+                { id: 'all', label: 'ALL TITLES' },
+                { id: 'esports', label: '🔥 ESPORTS' },
+                { id: 'shooter', label: '🎯 SHOOTERS' },
+                { id: 'moba', label: '🛡️ MOBA' },
+                { id: 'app', label: '⚡ APPS & WEB' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setGameCategoryFilter(cat.id)}
+                  className="cyber-button secondary"
+                  style={{
+                    ...styles.filterChip,
+                    borderColor: gameCategoryFilter === cat.id ? '#00f0ff' : 'rgba(255, 255, 255, 0.1)',
+                    backgroundColor: gameCategoryFilter === cat.id ? 'rgba(0, 240, 255, 0.15)' : 'rgba(15, 23, 42, 0.6)',
+                    color: gameCategoryFilter === cat.id ? '#00f0ff' : '#94a3b8',
+                  }}
+                >
+                  {cat.label}
+                </button>
+              ))}
             </div>
 
-            <div style={styles.gameGrid}>
-              {SENET_GAMES.map((game) => (
-                <div key={game.id} className="glass-panel" style={styles.gameTile}>
-                  {game.popular && <div style={styles.hotBadge}>POPULAR</div>}
-                  <div style={styles.gameIconBox}>
-                    <span style={styles.gameEmoji}>{game.icon}</span>
-                  </div>
-                  <div style={styles.gameMeta}>
-                    <div style={styles.gameTitle}>{game.name}</div>
-                    <div style={styles.gameTag}>{game.category}</div>
-                  </div>
-                  <button
-                    onClick={() => handleLaunchGame(game)}
-                    className="cyber-button"
-                    style={styles.playBtn}
-                  >
-                    {game.isWebEmbed ? 'RUN IN SYSTEM' : 'PLAY GAME'}
-                  </button>
-                </div>
+            {/* 3D Perspective Tilt Game Cards Grid */}
+            <div style={styles.gameGrid3D}>
+              {SENET_GAMES.filter((g) => {
+                if (gameCategoryFilter === 'all') return true;
+                if (gameCategoryFilter === 'esports') return g.popular;
+                if (gameCategoryFilter === 'shooter') return g.category.toLowerCase().includes('shooter');
+                if (gameCategoryFilter === 'moba') return g.category.toLowerCase().includes('moba');
+                if (gameCategoryFilter === 'app') return g.category.toLowerCase().includes('app') || g.isWebEmbed;
+                return true;
+              }).map((game) => (
+                <GameCard3D
+                  key={game.id}
+                  game={game}
+                  isRunning={runningGameId === game.id}
+                  onLaunch={handleLaunchGame}
+                  onKill={() => {
+                    setRunningGameId(null);
+                    setLaunchToast(`Terminated ${game.name}`);
+                  }}
+                  onHover={setHoveredGame}
+                />
               ))}
             </div>
           </div>
@@ -1286,8 +1396,120 @@ const styles: Record<string, React.CSSProperties> = {
   },
   centerTimerBox: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: '12px',
+  },
+  heroBanner: {
+    position: 'relative',
+    height: '210px',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    marginBottom: '18px',
+    border: '1px solid rgba(0, 240, 255, 0.25)',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6)',
+  },
+  heroBannerBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center 30%',
+    transition: 'background-image 0.4s ease',
+  },
+  heroBannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'linear-gradient(90deg, rgba(7, 9, 19, 0.95) 0%, rgba(7, 9, 19, 0.65) 55%, rgba(7, 9, 19, 0.2) 100%)',
+  },
+  heroBannerContent: {
+    position: 'relative',
+    zIndex: 2,
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '0 32px',
+    maxWidth: '650px',
+  },
+  heroTagRow: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '8px',
+  },
+  heroCategoryBadge: {
+    fontSize: '10px',
+    fontWeight: 900,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    color: '#00f0ff',
+    border: '1px solid rgba(0, 240, 255, 0.3)',
+    borderRadius: '6px',
+    padding: '3px 8px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  heroHotBadge: {
+    fontSize: '10px',
+    fontWeight: 900,
+    backgroundColor: 'rgba(255, 0, 127, 0.2)',
+    color: '#ff007f',
+    border: '1px solid rgba(255, 0, 127, 0.35)',
+    borderRadius: '6px',
+    padding: '3px 8px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontFamily: 'var(--font-cyber)',
+    fontSize: '32px',
+    fontWeight: 900,
+    color: '#fff',
+    margin: 0,
+    letterSpacing: '1px',
+    textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+  },
+  heroDesc: {
+    fontSize: '12px',
+    color: '#94a3b8',
+    margin: '6px 0 0 0',
+    lineHeight: 1.4,
+  },
+  heroLaunchBtn: {
+    padding: '10px 22px',
+    borderRadius: '8px',
+    border: 'none',
+    color: '#070913',
+    fontWeight: 900,
+    fontSize: '12px',
+    letterSpacing: '1px',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
+  categoryFilterBar: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+  },
+  filterChip: {
+    padding: '6px 14px',
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontWeight: 800,
+    letterSpacing: '0.8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  gameGrid3D: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+    gap: '20px',
+    paddingBottom: '24px',
   },
   timerSubtitle: {
     fontSize: '10px',

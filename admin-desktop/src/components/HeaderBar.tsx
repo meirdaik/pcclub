@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Megaphone, ShoppingBag, Receipt, RefreshCw, Settings } from 'lucide-react';
 import { ClubPc } from '../types';
 import { getAdminConfig } from '../services/config';
 
@@ -137,7 +138,7 @@ export default function HeaderBar({
             style={styles.toolBtn}
             title="Send on-screen broadcast popup to stations"
           >
-            📢 Broadcast
+            <Megaphone size={13} style={{ marginRight: 5 }} /> Broadcast
           </button>
 
           <button
@@ -151,7 +152,7 @@ export default function HeaderBar({
             }}
             title="Snack Bar Orders"
           >
-            🍔 Bar Orders {pendingOrdersCount > 0 ? `(${pendingOrdersCount})` : ''}
+            <ShoppingBag size={13} style={{ marginRight: 5 }} /> Bar Orders {pendingOrdersCount > 0 ? `(${pendingOrdersCount})` : ''}
           </button>
 
           <button
@@ -160,7 +161,7 @@ export default function HeaderBar({
             style={styles.toolBtn}
             title="Cashier Shift & Fiscal Z-Report"
           >
-            💵 Shift / Z-Report
+            <Receipt size={13} style={{ marginRight: 5 }} /> Shift / Z-Report
           </button>
 
           <button
@@ -169,7 +170,7 @@ export default function HeaderBar({
             style={styles.toolBtn}
             title="Force refresh stations"
           >
-            🔄 Sync
+            <RefreshCw size={13} style={{ marginRight: 5 }} /> Sync
           </button>
 
           <button
@@ -178,7 +179,7 @@ export default function HeaderBar({
             style={styles.toolBtn}
             title="Configure Server IP & Club Settings"
           >
-            ⚙️ Server
+            <Settings size={13} style={{ marginRight: 5 }} /> Server
           </button>
         </div>
       </div>

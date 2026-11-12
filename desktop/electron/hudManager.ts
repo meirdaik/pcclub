@@ -14,8 +14,8 @@ class HudManager {
 
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width: screenWidth } = primaryDisplay.workAreaSize;
-    const hudWidth = 460;
-    const hudHeight = 44;
+    const hudWidth = 490;
+    const hudHeight = 46;
     const x = Math.round((screenWidth - hudWidth) / 2);
     const y = 8;
 
@@ -49,38 +49,67 @@ class HudManager {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body {
-      background: rgba(7, 9, 19, 0.92);
-      border: 1px solid #00f0ff;
-      border-radius: 22px;
-      height: 42px;
+      background: rgba(8, 12, 26, 0.88);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 23px;
+      height: 44px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 14px;
+      padding: 0 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #fff;
-      box-shadow: 0 0 18px rgba(0, 240, 255, 0.4);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.25);
       -webkit-app-region: drag;
+      cursor: grab;
+    }
+    .left-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00f0ff;
+      box-shadow: 0 0 10px #00f0ff;
+      animation: pulseGlow 1.8s infinite;
+    }
+    @keyframes pulseGlow {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.4; transform: scale(0.9); }
     }
     .badge {
       font-weight: 900;
       font-size: 11px;
       color: #00f0ff;
-      letter-spacing: 1px;
-      background: rgba(0, 240, 255, 0.15);
-      padding: 3px 8px;
-      border-radius: 10px;
+      letter-spacing: 1.5px;
+      font-family: monospace;
+    }
+    .timer-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .timer {
       font-weight: 900;
-      font-size: 14px;
+      font-size: 13px;
       color: #00ff88;
       font-family: monospace;
       letter-spacing: 0.5px;
+      text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
     }
-    .timer.warning { color: #ffaa00; }
-    .timer.danger { color: #ff0055; animation: pulse 1s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+    .timer.warning { color: #ffaa00; text-shadow: 0 0 8px rgba(255, 170, 0, 0.6); }
+    .timer.danger { color: #ff0055; text-shadow: 0 0 12px rgba(255, 0, 85, 0.8); animation: pulseDanger 1s infinite; }
+    @keyframes pulseDanger { 0% { opacity: 1; } 50% { opacity: 0.35; } 100% { opacity: 1; } }
     .btn-group {
       display: flex;
       gap: 6px;
@@ -88,30 +117,41 @@ class HudManager {
     }
     button {
       background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       color: #e2e8f0;
-      padding: 4px 9px;
+      padding: 5px 11px;
       border-radius: 12px;
       font-size: 10px;
-      font-weight: bold;
+      font-weight: 800;
+      letter-spacing: 0.5px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     button:hover {
       background: #00f0ff;
       color: #070913;
       border-color: #00f0ff;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+      transform: translateY(-1px);
     }
     button.danger:hover {
       background: #ff0055;
       color: #fff;
       border-color: #ff0055;
+      box-shadow: 0 0 12px rgba(255, 0, 85, 0.6);
     }
   </style>
 </head>
 <body>
-  <span class="badge" id="pcBadge">PC #1</span>
-  <span class="timer" id="timer">--:--:--</span>
+  <div class="left-group">
+    <div class="pulse-dot"></div>
+    <span class="badge" id="pcBadge">PC #1</span>
+  </div>
+
+  <div class="timer-container">
+    <span class="timer" id="timer">--:--:--</span>
+  </div>
+
   <div class="btn-group">
     <button onclick="sendAction('return-launcher')">🖥️ LAUNCHER</button>
     <button onclick="sendAction('call-admin')">🚨 HELP</button>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Play, Plus, Lock, Settings } from 'lucide-react';
 import { ClubPc } from '../types';
 
 interface PcCardProps {
@@ -308,7 +309,7 @@ export default function PcCard({
               style={styles.quickActionBtn}
               title="Add 30 minutes to session"
             >
-              +30m
+              <Plus size={11} style={{ marginRight: 2 }} /> 30m
             </button>
             <button
               onClick={() => onQuickExtend(pc, 3600)}
@@ -316,7 +317,7 @@ export default function PcCard({
               style={styles.quickActionBtn}
               title="Add 1 hour to session"
             >
-              +1h
+              <Plus size={11} style={{ marginRight: 2 }} /> 1h
             </button>
             <button
               onClick={() => onQuickLock(pc)}
@@ -324,15 +325,15 @@ export default function PcCard({
               style={styles.quickActionBtn}
               title="Terminate session and kill game processes"
             >
-              🔒 Lock
+              <Lock size={11} style={{ marginRight: 3 }} /> Lock
             </button>
             <button
               onClick={() => onOpenControl(pc)}
               className="cyber-button"
-              style={styles.quickActionBtn}
+              style={{ ...styles.quickActionBtn, minWidth: '36px', padding: '6px' }}
               title="Open full station details and telemetry"
             >
-              ⚙️
+              <Settings size={13} />
             </button>
           </div>
         ) : (
@@ -340,17 +341,17 @@ export default function PcCard({
             <button
               onClick={() => onQuickUnlock(pc)}
               className="cyber-button"
-              style={{ ...styles.quickActionBtn, flex: 2 }}
+              style={{ ...styles.quickActionBtn, flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
               disabled={isOffline}
             >
-              🚀 UNLOCK (1H)
+              <Play size={12} /> UNLOCK (1H)
             </button>
             <button
               onClick={() => onOpenControl(pc)}
               className="cyber-button secondary"
-              style={{ ...styles.quickActionBtn, flex: 1 }}
+              style={{ ...styles.quickActionBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
             >
-              ⚙️ MANAGE
+              <Settings size={12} /> MANAGE
             </button>
           </div>
         )}
