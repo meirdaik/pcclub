@@ -629,8 +629,10 @@ async def list_admin_tariffs(session: SessionDep) -> list[dict[str, Any]]:
             "id": str(t.id),
             "name": t.name,
             "zone": t.zone,
+            "zone_name": t.zone,
             "duration_minutes": t.duration_minutes,
             "price_kzt": t.price_kzt,
+            "is_package": t.duration_minutes >= 300 or "pack" in t.name.lower() or "night" in t.name.lower(),
         }
         for t in tariffs
     ]

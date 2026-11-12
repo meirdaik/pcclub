@@ -29,18 +29,24 @@ export default function PcControlModal({
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const isBusy = pc.status === 'BUSY';
-  const isVip = pc.zone.toLowerCase().includes('vip');
+  const pcZone = pc.zone || 'Standard';
+  const isVip = pcZone.toLowerCase().includes('vip');
 
   // Filter tariffs by zone or fallback
-  const availableTariffs = tariffs.length > 0
-    ? tariffs.filter((t) => t.zone_name.toLowerCase().includes(isVip ? 'vip' : 'standard'))
-    : [
-        { id: '1', name: '1 Hour', duration_minutes: 60, price_kzt: isVip ? 1500 : 800, zone_name: pc.zone, is_package: false },
-        { id: '2', name: '2 Hours', duration_minutes: 120, price_kzt: isVip ? 2800 : 1500, zone_name: pc.zone, is_package: false },
-        { id: '3', name: '3 Hours', duration_minutes: 180, price_kzt: isVip ? 3900 : 2100, zone_name: pc.zone, is_package: false },
-        { id: '4', name: '5 Hours Pack', duration_minutes: 300, price_kzt: isVip ? 6000 : 3200, zone_name: pc.zone, is_package: true },
-        { id: '5', name: 'Night Pass (8h)', duration_minutes: 480, price_kzt: isVip ? 7500 : 4000, zone_name: pc.zone, is_package: true },
-      ];
+  const filteredTariffs = (tariffs || []).filter((t) => {
+    const tariffZone = (t.zone_name || t.zone || '').toLowerCase();
+    return tariffZone.includes(isVip ? 'vip' : 'standard');
+  });
+
+  const defaultTariffs: Tariff[] = [
+    { id: 'def-1', name: '1 Hour', duration_minutes: 60, price_kzt: isVip ? 1500 : 800, zone_name: pcZone, zone: pcZone, is_package: false },
+    { id: 'def-2', name: '2 Hours', duration_minutes: 120, price_kzt: isVip ? 2800 : 1500, zone_name: pcZone, zone: pcZone, is_package: false },
+    { id: 'def-3', name: '3 Hours', duration_minutes: 180, price_kzt: isVip ? 3900 : 2100, zone_name: pcZone, zone: pcZone, is_package: false },
+    { id: 'def-4', name: '5 Hours Pack', duration_minutes: 300, price_kzt: isVip ? 6000 : 3200, zone_name: pcZone, zone: pcZone, is_package: true },
+    { id: 'def-5', name: 'Night Pass (8h)', duration_minutes: 480, price_kzt: isVip ? 7500 : 4000, zone_name: pcZone, zone: pcZone, is_package: true },
+  ];
+
+  const availableTariffs = filteredTariffs.length > 0 ? filteredTariffs : defaultTariffs;
 
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +172,7 @@ export default function PcControlModal({
                   <div style={styles.activeTimerBox}>
                     <div style={styles.sessionStatusLabel}>TIME REMAINING</div>
                     <div style={styles.activeTimerVal} className="font-orbitron">
-                      {Math.floor(pc.remaining_seconds / 60)}m {pc.remaining_seconds % 60}s
+                      {Math.floor((pc.remaining_seconds || 0) / 60)}m {(pc.remaining_seconds || 0) % 60}s
                     </div>
                   </div>
                 </div>
@@ -341,7 +347,7 @@ export default function PcControlModal({
                 {pc.processes && pc.processes.length > 0 ? (
                   pc.processes.map((p, idx) => (
                     <div key={idx} style={styles.processItem}>
-                      <span>⚡ {typeof p === 'string' ? p : p.name}</span>
+                      <span>⚡ {typeof p === 'string' ? p : (p?.name || 'Process')}</span>
                       <span style={styles.runningBadge}>RUNNING</span>
                     </div>
                   ))

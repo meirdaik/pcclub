@@ -83,10 +83,11 @@ export interface ChatMessage {
 export interface Tariff {
   id: string;
   name: string;
-  zone_name: string;
+  zone?: string;
+  zone_name?: string;
   duration_minutes: number;
   price_kzt: number;
-  is_package: boolean;
+  is_package?: boolean;
 }
 
 export interface AdminConfig {
