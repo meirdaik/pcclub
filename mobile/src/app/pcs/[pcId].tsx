@@ -17,7 +17,7 @@ import {
   overlapsAny,
   slotEnd,
 } from '@/lib/slots';
-import { addDays, dateKey, formatTime, toZoned } from '@/lib/time';
+import { addDays, dateKey, formatTime, parseInstant, toZoned } from '@/lib/time';
 import { useLoad } from '@/lib/useLoad';
 import { useNow } from '@/lib/useNow';
 import { Button, Chip, Loadable, Notice, Screen } from '@/ui/components';
@@ -55,8 +55,8 @@ export default function BookPcScreen() {
   const busy = useMemo(
     () =>
       (availability.data?.busy ?? []).map((interval) => ({
-        start: Date.parse(interval.starts_at),
-        end: Date.parse(interval.ends_at),
+        start: parseInstant(interval.starts_at),
+        end: parseInstant(interval.ends_at),
       })),
     [availability.data],
   );

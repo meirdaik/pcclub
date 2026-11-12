@@ -9,10 +9,20 @@ import {
   overlapsAny,
   slotEnd,
 } from './slots.ts';
-import { addDays, dateKey, formatTime, fromZoned, toZoned, weekday } from './time.ts';
+import { addDays, dateKey, formatTime, fromZoned, parseInstant, toZoned, weekday } from './time.ts';
 
 const ALMATY = 'Asia/Almaty'; // UTC+5, no DST
 const HOUR = 3_600_000;
+
+test('parseInstant reads API timestamps with any number of fractional digits', () => {
+  const expected = Date.UTC(2026, 10, 12, 7, 0, 0);
+  assert.equal(parseInstant('2026-11-12T07:00:00Z'), expected);
+  assert.equal(parseInstant('2026-11-12T07:00:00.123456Z'), expected + 123);
+  assert.equal(parseInstant('2026-11-12T07:00:00.123Z'), expected + 123);
+  assert.equal(parseInstant('2026-11-12T07:00:00.5Z'), expected + 500);
+  assert.equal(parseInstant('2026-11-12T12:00:00.123456+05:00'), expected + 123);
+  assert.ok(Number.isNaN(parseInstant('not a date')));
+});
 
 test('toZoned shows the club clock, not UTC', () => {
   const noonAlmaty = Date.UTC(2026, 5, 1, 7, 0);

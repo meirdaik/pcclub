@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { type Booking, listBookings, listClubs } from '@/api/endpoints';
 import { errorMessage, formatInstantDay, formatKzt, t } from '@/i18n';
-import { formatTime } from '@/lib/time';
+import { formatTime, parseInstant } from '@/lib/time';
 import { useLoad } from '@/lib/useLoad';
 import { Button, Card, Loadable, Notice, Screen } from '@/ui/components';
 import { StatusBadge } from '@/ui/StatusBadge';
@@ -54,8 +54,8 @@ export default function BookingsScreen() {
               {items.map((booking) => {
                 const club = clubs.get(booking.club_id);
                 const zone = club?.timezone ?? FALLBACK_ZONE;
-                const start = Date.parse(booking.starts_at);
-                const end = Date.parse(booking.ends_at);
+                const start = parseInstant(booking.starts_at);
+                const end = parseInstant(booking.ends_at);
                 return (
                   <Card
                     key={booking.id}

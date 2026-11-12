@@ -15,7 +15,7 @@ import {
   simulateMockPayment,
 } from '@/api/endpoints';
 import { errorMessage, formatCountdown, formatInstantDay, formatKzt, t } from '@/i18n';
-import { formatTime } from '@/lib/time';
+import { formatTime, parseInstant } from '@/lib/time';
 import { useLoad } from '@/lib/useLoad';
 import { useNow } from '@/lib/useNow';
 import { Button, Card, Chip, Loadable, Notice, Row, Screen } from '@/ui/components';
@@ -142,7 +142,7 @@ export default function BookingScreen() {
   const booking = state.data?.booking ?? null;
   const holdDeadline =
     booking?.status === 'pending_payment' && booking.hold_expires_at
-      ? Date.parse(booking.hold_expires_at)
+      ? parseInstant(booking.hold_expires_at)
       : null;
   const now = useNow(1000);
   const holdLeft = holdDeadline === null ? null : Math.max(0, holdDeadline - now);
@@ -173,8 +173,8 @@ export default function BookingScreen() {
       <Loadable state={state}>
         {({ booking: current, club, pc }) => {
           const zone = club.timezone;
-          const start = Date.parse(current.starts_at);
-          const end = Date.parse(current.ends_at);
+          const start = parseInstant(current.starts_at);
+          const end = parseInstant(current.ends_at);
           const pending = current.status === 'pending_payment';
           const cancellable =
             (pending || current.status === 'confirmed') && start > now;
