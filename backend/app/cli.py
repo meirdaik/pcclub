@@ -39,7 +39,7 @@ async def create_owner(org_name: str, email: str, password: str) -> None:
 
 
 async def seed_demo() -> None:
-    """A demo club with two zones and ten PCs, for local development only."""
+    """Demo clubs with zones, PCs and packages, for local development only."""
     if get_settings().environment == "prod":
         sys.exit("seed-demo is not available in production")
     async with get_sessionmaker()() as session:
@@ -64,60 +64,70 @@ async def seed_demo() -> None:
         )
         session.add_all([club, daytime])
         await session.flush()
-        standard = Zone(club_id=club.id, name="Standard", price_per_hour_kzt=800)
-        vip = Zone(club_id=club.id, name="VIP", price_per_hour_kzt=1500)
-        day = Zone(club_id=daytime.id, name="Standard", price_per_hour_kzt=700)
-        session.add_all([standard, vip, day])
+        # Demo Arena follows a real club price list: three zones, each with an hourly price,
+        # "2+1" and "3+2" hour bundles, a day window and a night window (18+).
+        # zone name: (PC label prefix, PCs, hourly, 2+1 hours, 3+2 hours, day, night) in tenge
+        arena_zones = {
+            "Standart": ("S", 6, 630, 1260, 1890, 1050, 2100),
+            "5x5 Zona": ("5X5", 5, 980, 1960, 2940, 1400, 2940),
+            "VIP Zona": ("VIP", 4, 1050, 2100, 3150, 1750, 3150),
+        }
+        for name, (
+            prefix,
+            pcs,
+            hourly,
+            two_plus_one,
+            three_plus_two,
+            day,
+            night,
+        ) in arena_zones.items():
+            zone = Zone(club_id=club.id, name=name, price_per_hour_kzt=hourly)
+            session.add(zone)
+            await session.flush()
+            session.add_all(
+                [
+                    Pc(club_id=club.id, zone_id=zone.id, label=f"{prefix}-{n:02d}")
+                    for n in range(1, pcs + 1)
+                ]
+            )
+            session.add_all(
+                [
+                    Package(
+                        zone_id=zone.id,
+                        name="2+1 час",
+                        duration_minutes=180,
+                        price_kzt=two_plus_one,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="3+2 час",
+                        duration_minutes=300,
+                        price_kzt=three_plus_two,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="День",
+                        window_start=time(8),
+                        window_end=time(18),
+                        price_kzt=day,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="Ночь",
+                        window_start=time(22),
+                        window_end=time(8),
+                        price_kzt=night,
+                    ),
+                ]
+            )
+        # The daytime club has only an hourly price.
+        daytime_zone = Zone(club_id=daytime.id, name="Standard", price_per_hour_kzt=700)
+        session.add(daytime_zone)
         await session.flush()
         session.add_all(
-            [Pc(club_id=club.id, zone_id=standard.id, label=f"S-{n:02d}") for n in range(1, 7)]
-            + [Pc(club_id=club.id, zone_id=vip.id, label=f"VIP-{n:02d}") for n in range(1, 5)]
-            + [Pc(club_id=daytime.id, zone_id=day.id, label=f"D-{n:02d}") for n in range(1, 5)]
-        )
-        # Made-up demo packages in the usual cyber-club shape: hour bundles plus morning, day
-        # and night windows. The night window is 18+ (it lies inside 22:00-06:00).
-        session.add_all(
             [
-                Package(zone_id=standard.id, name="3 часа", duration_minutes=180, price_kzt=2000),
-                Package(zone_id=standard.id, name="5 часов", duration_minutes=300, price_kzt=3200),
-                Package(
-                    zone_id=standard.id,
-                    name="Утро",
-                    window_start=time(8),
-                    window_end=time(13),
-                    price_kzt=2000,
-                ),
-                Package(
-                    zone_id=standard.id,
-                    name="День",
-                    window_start=time(13),
-                    window_end=time(18),
-                    price_kzt=2800,
-                ),
-                Package(
-                    zone_id=standard.id,
-                    name="Ночь",
-                    window_start=time(22),
-                    window_end=time(8),
-                    price_kzt=3500,
-                ),
-                Package(zone_id=vip.id, name="3 часа", duration_minutes=180, price_kzt=3800),
-                Package(zone_id=vip.id, name="5 часов", duration_minutes=300, price_kzt=6000),
-                Package(
-                    zone_id=vip.id,
-                    name="Ночь",
-                    window_start=time(22),
-                    window_end=time(8),
-                    price_kzt=6500,
-                ),
-                Package(zone_id=day.id, name="3 часа", duration_minutes=180, price_kzt=1800),
-                Package(
-                    zone_id=day.id,
-                    name="День",
-                    window_start=time(10),
-                    window_end=time(17),
-                    price_kzt=3500,
-                ),
+                Pc(club_id=daytime.id, zone_id=daytime_zone.id, label=f"D-{n:02d}")
+                for n in range(1, 5)
             ]
         )
         await session.commit()
