@@ -1,9 +1,9 @@
 import { AdminConfig } from '../types';
 
 let cachedConfig: AdminConfig = {
-  serverIp: '10.72.49.124',
+  serverIp: '127.0.0.1',
   serverPort: 8000,
-  serverUrl: 'http://10.72.49.124:8000',
+  serverUrl: 'http://127.0.0.1:8000',
   clubName: 'CYBER ARENA CLUB',
   cashierName: 'Operator',
   authToken: 'dev-pc-token',
