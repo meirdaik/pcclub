@@ -2,6 +2,8 @@
   "name": "pcclub-root",
   "private": true,
   "scripts": {
+    "dev:all": "start-all-dev.bat",
+    "build:product": "build-product.bat",
     "postinstall": "npm --prefix mobile install",
     "dev": "node server.mjs",
     "start": "node server.mjs",

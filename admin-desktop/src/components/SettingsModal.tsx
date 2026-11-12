@@ -19,6 +19,25 @@ export default function SettingsModal({ onClose, onSaved }: SettingsModalProps) 
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const handleAutoDetect = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch(`http://127.0.0.1:${serverPort || 8000}/api/system/info`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.server_ip) {
+          setServerIp(data.server_ip);
+          setTestResult({ ok: true, message: `✓ Auto-detected local server IP: ${data.server_ip}` });
+          setTesting(false);
+          return;
+        }
+      }
+    } catch {}
+    setTestResult({ ok: false, message: 'Could not auto-detect server on 127.0.0.1:8000. Ensure run-server.bat is running.' });
+    setTesting(false);
+  };
+
   const handleTest = async () => {
     setTesting(true);
     setTestResult(null);
@@ -61,13 +80,25 @@ export default function SettingsModal({ onClose, onSaved }: SettingsModalProps) 
 
         <form onSubmit={handleSave} style={styles.body}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>SERVER LAN IP ADDRESS</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={styles.label}>SERVER LAN IP ADDRESS</label>
+              <button
+                type="button"
+                onClick={handleAutoDetect}
+                disabled={testing}
+                className="cyber-button secondary"
+                style={{ fontSize: '10px', padding: '3px 8px' }}
+                title="Detect IP from local backend instance"
+              >
+                📡 AUTO-DETECT
+              </button>
+            </div>
             <input
               type="text"
               className="cyber-input"
               value={serverIp}
               onChange={(e) => setServerIp(e.target.value)}
-              placeholder="e.g. 10.72.49.124 or 192.168.1.100"
+              placeholder="e.g. 10.72.161.182 or 192.168.1.100"
               required
             />
             <span style={styles.hint}>The Local IP of the main PC running the FastAPI backend.</span>

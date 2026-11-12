@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
+  saveConfig: (cfg: any) => ipcRenderer.invoke('save-config', cfg),
   launchApp: (exePathOrUri: string) => ipcRenderer.invoke('launch-app', exePathOrUri),
   getPcInfo: () => ipcRenderer.invoke('get-pc-info'),
   getSystemStats: () => ipcRenderer.invoke('get-system-stats'),

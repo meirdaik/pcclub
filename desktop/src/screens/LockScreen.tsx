@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SessionInfo } from '../types';
 import { getAppConfig } from '../services/config';
+import { socketService } from '../services/socket';
+import ConnectionSetupModal from '../components/ConnectionSetupModal';
 
 const MOBILE_APP_URL = import.meta.env.VITE_MOBILE_APP_URL || 'https://pcclub.kz/app';
 
@@ -11,16 +13,18 @@ interface LockScreenProps {
 }
 
 export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
-  const config = getAppConfig();
+  const [config, setConfig] = useState(getAppConfig());
   const pcLabel = config.pcLabel;
   const pcId = config.pcId;
   const serverUrl = config.serverUrl;
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('player1');
+  const [password, setPassword] = useState('player123');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const [isWsConnected, setIsWsConnected] = useState(socketService.isConnected());
 
   useEffect(() => {
     const updateTime = () => {
@@ -31,11 +35,24 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
       setCurrentDate(
         now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
       );
+      setIsWsConnected(socketService.isConnected());
     };
 
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for Ctrl+Shift+S admin shortcut to open Connection Setup
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        setIsSetupOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleManualUnlock = async (e: React.FormEvent) => {
@@ -50,15 +67,8 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
     setError(null);
 
     const isAdmin = trimmedUser.toLowerCase() === 'admin';
-
-    // Call onUnlock immediately so the user enters without delay
-    if (onUnlock) {
-      onUnlock({
-        username: trimmedUser,
-        remainingSeconds: isAdmin ? 99999 : 3600,
-        isAdmin,
-      });
-    }
+    let authSucceeded = false;
+    let authData: any = null;
 
     try {
       const endpoints = [
@@ -74,18 +84,44 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
             body: JSON.stringify({
               username: trimmedUser,
               password: password || undefined,
-              remaining_seconds: 3600,
+              remaining_seconds: isAdmin ? 99999 : 3600,
             }),
+            signal: AbortSignal.timeout(4000),
           });
-          if (response.ok) break;
+
+          if (response.status === 401) {
+            setError('Invalid username or password.');
+            setLoading(false);
+            return;
+          }
+
+          if (response.ok) {
+            const resJson = await response.json();
+            authData = resJson.data || resJson;
+            authSucceeded = true;
+            break;
+          }
         } catch {
-          // ignore and try next endpoint
+          // try next endpoint
         }
       }
     } catch (err: unknown) {
-      console.warn('Backend sync failed, continuing offline:', err);
+      console.warn('Backend sync failed:', err);
     } finally {
       setLoading(false);
+    }
+
+    if (authSucceeded && authData) {
+      if (onUnlock) {
+        onUnlock({
+          username: authData.username || trimmedUser,
+          remainingSeconds: authData.remaining_seconds || (isAdmin ? 99999 : 3600),
+          isAdmin: Boolean(authData.is_admin || isAdmin),
+          balanceKzt: authData.balance,
+        });
+      }
+    } else {
+      setError('Cannot connect to club server. Check Server IP in Setup (Ctrl+Shift+S).');
     }
   };
 
@@ -98,6 +134,14 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
           <span style={styles.logoText}>CYBER CLUB ARENA</span>
         </div>
         <div style={styles.headerRightControls}>
+          <button
+            onClick={() => setIsSetupOpen(true)}
+            className="cyber-button secondary"
+            style={styles.setupBtn}
+            title="Configure Server LAN IP and Station ID (Ctrl+Shift+S)"
+          >
+            ⚙️ SETUP
+          </button>
           {onOpenAdmin && (
             <button
               onClick={onOpenAdmin}
@@ -114,6 +158,17 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
           </div>
         </div>
       </header>
+
+      {/* Disconnection Warning Ribbon */}
+      {!isWsConnected && (
+        <div
+          onClick={() => setIsSetupOpen(true)}
+          style={styles.disconnectedBanner}
+          title="Click to configure Server IP"
+        >
+          <span>⚠️ Server Disconnected at {serverUrl} — Click here or press Ctrl+Shift+S to open Connection Setup</span>
+        </div>
+      )}
 
       {/* Main Lock Screen Content */}
       <main style={styles.mainContent}>
@@ -199,14 +254,42 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
           <span>SYSTEM READY • TERMINAL #{pcId}</span>
         </div>
         <div style={styles.footerHotkeys}>
-          Developer Exit: <kbd style={styles.kbd}>Ctrl</kbd> + <kbd style={styles.kbd}>Shift</kbd> + <kbd style={styles.kbd}>Q</kbd>
+          Setup: <kbd style={styles.kbd}>Ctrl</kbd> + <kbd style={styles.kbd}>Shift</kbd> + <kbd style={styles.kbd}>S</kbd> | Emergency Exit: <kbd style={styles.kbd}>Ctrl</kbd> + <kbd style={styles.kbd}>Shift</kbd> + <kbd style={styles.kbd}>Q</kbd>
         </div>
       </footer>
+
+      {/* Station & Server Connection Setup Modal */}
+      {isSetupOpen && (
+        <ConnectionSetupModal
+          onClose={() => setIsSetupOpen(false)}
+          onSaved={() => {
+            setConfig(getAppConfig());
+          }}
+        />
+      )}
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  setupBtn: {
+    padding: '8px 16px',
+    fontSize: '12px',
+    letterSpacing: '0.8px',
+  },
+  disconnectedBanner: {
+    margin: '10px 0',
+    padding: '10px 18px',
+    backgroundColor: 'rgba(255, 0, 85, 0.2)',
+    border: '1px solid #ff0055',
+    borderRadius: '8px',
+    color: '#ff4d88',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    textAlign: 'center',
+    boxShadow: '0 0 12px rgba(255, 0, 85, 0.25)',
+  },
   container: {
     display: 'flex',
     flexDirection: 'column',

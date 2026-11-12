@@ -239,6 +239,26 @@ class SocketService {
       this.handlers.delete(handler);
     };
   }
+
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  reconnectWithConfig(): void {
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {}
+      this.ws = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempt = 0;
+    this.shouldReconnect = true;
+    this.doConnect();
+  }
 }
 
 export const socketService = new SocketService();

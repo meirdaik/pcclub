@@ -489,6 +489,44 @@ ipcMain.handle('get-config', () => {
   return appConfig;
 });
 
+ipcMain.handle('save-config', async (_event, newConfig: Partial<RuntimeConfig>) => {
+  if (newConfig.serverIp) appConfig.serverIp = newConfig.serverIp.trim();
+  if (newConfig.serverPort) appConfig.serverPort = Number(newConfig.serverPort) || 8000;
+  if (newConfig.pcId) {
+    appConfig.pcId = String(newConfig.pcId);
+    appConfig.pcNumber = Number(String(newConfig.pcId).replace(/\D/g, '') || 1);
+  }
+  if (newConfig.pcLabel) appConfig.pcLabel = newConfig.pcLabel;
+  appConfig.serverUrl = `http://${appConfig.serverIp}:${appConfig.serverPort}`;
+  appConfig.wsUrl = `ws://${appConfig.serverIp}:${appConfig.serverPort}`;
+
+  const payload = {
+    serverIp: appConfig.serverIp,
+    serverPort: appConfig.serverPort,
+    pcId: appConfig.pcId,
+    pcNumber: appConfig.pcNumber,
+    pcLabel: appConfig.pcLabel,
+    authToken: appConfig.authToken,
+  };
+
+  const candidateWritePaths = [
+    path.join(app.getPath('userData'), 'config.json'),
+    path.join(__dirname, '../config.json'),
+    path.join(process.cwd(), 'config.json'),
+    path.join(path.dirname(process.execPath), 'config.json'),
+  ];
+
+  for (const p of candidateWritePaths) {
+    try {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, JSON.stringify(payload, null, 2), 'utf-8');
+    } catch {}
+  }
+
+  console.log('[SENET Config] Configuration saved successfully:', appConfig);
+  return { success: true, config: appConfig };
+});
+
 ipcMain.handle('get-pc-info', async () => {
   return {
     pcId: appConfig.pcId,

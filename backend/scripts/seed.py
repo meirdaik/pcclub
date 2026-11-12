@@ -121,15 +121,15 @@ async def seed() -> None:
             session.add(vaqlur)
         await session.flush()
 
-        # 5. PCs (10 gaming stations: PC #1..5 in Standard, PC #6..10 in VIP)
+        # 5. PCs (12 gaming stations: PC #1..8 in Standard, PC #9..12 in VIP)
         existing_pcs = (await session.scalars(select(Pc).where(Pc.club_id == club.id))).all()
-        if len(existing_pcs) < 10:
+        if len(existing_pcs) < 12:
             existing_labels = {p.label for p in existing_pcs}
-            for i in range(1, 11):
+            for i in range(1, 13):
                 label = f"PC #{i}"
                 if label in existing_labels:
                     continue
-                is_vip = i > 5
+                is_vip = i > 8
                 zone = vip_zone if is_vip else std_zone
                 specs = {
                     "cpu": "Intel Core i7-14700KF" if is_vip else "Intel Core i5-13400F",
@@ -152,7 +152,7 @@ async def seed() -> None:
                     specs=specs,
                 )
                 session.add(pc)
-            print("[SEED] Created 10 Club PCs (5 Standard, 5 VIP).")
+            print("[SEED] Created 12 Club PCs (8 Standard, 4 VIP).")
 
         # 6. Tariffs
         existing_tariffs = (await session.scalars(select(Tariff))).all()

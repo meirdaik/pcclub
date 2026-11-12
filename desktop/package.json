@@ -48,10 +48,12 @@
     ],
     "win": {
       "target": [
-        "portable",
-        "zip"
+        "portable"
       ],
       "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "PCClub-Gaming-Client.exe"
     }
   }
 }

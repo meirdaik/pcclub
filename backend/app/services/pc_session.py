@@ -37,6 +37,17 @@ class PcSessionManager:
                 pass
         self._connections[pc_id] = ws
 
+        # Normalize number and establish canonical aliases
+        digits = "".join(filter(str.isdigit, str(pc_id)))
+        canonical = pc_id
+        if digits:
+            num = int(digits)
+            canonical = f"pc-{num:03d}"
+            label = f"PC #{num}"
+            name = f"PC-{num:02d}"
+            for alt in (str(pc_id), canonical, label, name, str(num), f"pc-{num}"):
+                self._aliases[alt] = canonical
+
         # Initialize or preserve telemetry
         canonical = self._aliases.get(pc_id, pc_id)
         if canonical not in self._telemetry:
@@ -67,9 +78,6 @@ class PcSessionManager:
         if target in self._telemetry:
             self._telemetry[target]["status"] = "OFFLINE"
 
-        # Clean any aliases pointing to this pc_id
-        for k in [k for k, v in self._aliases.items() if v == pc_id or k == pc_id]:
-            self._aliases.pop(k, None)
         logger.info("PC %s: disconnected", pc_id)
 
     async def send_command(
@@ -77,7 +85,13 @@ class PcSessionManager:
     ) -> bool:
         """Send a JSON command to a connected PC. Returns ``True`` on success."""
         target_id = self._aliases.get(pc_id, pc_id)
-        ws = self._connections.get(target_id)
+        ws = self._connections.get(target_id) or self._connections.get(pc_id)
+        if ws is None:
+            # Also try finding any connection whose alias points to target_id
+            for conn_id, conn_ws in self._connections.items():
+                if self._aliases.get(conn_id) == target_id:
+                    ws = conn_ws
+                    break
         if ws is None:
             return False
 

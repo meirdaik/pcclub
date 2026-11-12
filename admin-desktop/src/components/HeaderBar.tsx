@@ -42,6 +42,7 @@ export default function HeaderBar({
   const config = getAdminConfig();
   const [clock, setClock] = useState('');
   const [dateStr, setDateStr] = useState('');
+  const [detectedLanIp, setDetectedLanIp] = useState<string | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -53,6 +54,22 @@ export default function HeaderBar({
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    const fetchInfo = async () => {
+      try {
+        const res = await fetch(`${config.serverUrl}/api/system/info`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.server_ip) {
+            setDetectedLanIp(data.server_ip);
+          }
+        }
+      } catch {}
+    };
+    fetchInfo();
+  }, [isConnected, config.serverUrl]);
 
   const total = pcs.length;
   const busyCount = pcs.filter((p) => p.status === 'BUSY').length;
@@ -75,7 +92,11 @@ export default function HeaderBar({
             </div>
           </div>
 
-          <div style={styles.serverBadge}>
+          <div
+            style={{ ...styles.serverBadge, cursor: 'pointer' }}
+            onClick={onOpenSettings}
+            title="Click to configure Server LAN IP and port"
+          >
             <span
               style={{
                 ...styles.dot,
@@ -84,7 +105,9 @@ export default function HeaderBar({
               }}
             />
             <span style={styles.serverText}>
-              {isConnected ? `Server: ${config.serverIp}:${config.serverPort}` : 'Server Disconnected (Retrying...)'}
+              {isConnected
+                ? `📡 Club Server LAN: ${detectedLanIp || config.serverIp}:${config.serverPort} (Enter on PCs & Mobile)`
+                : '● Server Disconnected (Click to configure IP)'}
             </span>
           </div>
         </div>
