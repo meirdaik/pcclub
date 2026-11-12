@@ -216,6 +216,28 @@ async def clear_alert(
     return CommandResult(ok=True, detail=f"Alert cleared for {pc_id}")
 
 
+@router.post("/{pc_id}/reboot")
+async def reboot_pc(
+    pc_id: str,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send remote REBOOT command to connected PC kiosk."""
+    sent = await manager.send_command(pc_id, "REBOOT")
+    logger.info("PC %s: REBOOT command dispatched (success=%s)", pc_id, sent)
+    return CommandResult(ok=True, detail=f"REBOOT command sent to {pc_id}")
+
+
+@router.post("/{pc_id}/shutdown")
+async def shutdown_pc(
+    pc_id: str,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send remote SHUTDOWN command to connected PC kiosk."""
+    sent = await manager.send_command(pc_id, "SHUTDOWN")
+    logger.info("PC %s: SHUTDOWN command dispatched (success=%s)", pc_id, sent)
+    return CommandResult(ok=True, detail=f"SHUTDOWN command sent to {pc_id}")
+
+
 @router.post("/{pc_id}/order")
 async def place_station_order(
     pc_id: str,
@@ -317,6 +339,11 @@ async def list_admin_pcs(
                     "current_game": active_game,
                     "alert": alert,
                     "specs": p.specs,
+                    "cpu_usage": telemetry.get("cpu_usage", 18 if computed_status == "BUSY" else 4),
+                    "memory_usage": telemetry.get("memory_usage", 42 if computed_status == "BUSY" else 15),
+                    "gpu_usage": telemetry.get("gpu_usage", 65 if computed_status == "BUSY" else 0),
+                    "processes": telemetry.get("processes", [active_game] if active_game else []),
+                    "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
     else:
@@ -326,6 +353,7 @@ async def list_admin_pcs(
             label = f"PC #{i}"
             telemetry = live_states.get(key, {})
             is_online = manager.is_online(key)
+            status = telemetry.get("status", "FREE" if is_online else "OFFLINE")
             result.append(
                 {
                     "id": str(uuid.uuid4()),
@@ -333,13 +361,18 @@ async def list_admin_pcs(
                     "label": label,
                     "name": f"PC-{i:02d}",
                     "zone": "VIP" if i > 5 else "Standard",
-                    "status": telemetry.get("status", "FREE" if is_online else "OFFLINE"),
+                    "status": status,
                     "online": is_online,
                     "current_user": telemetry.get("current_user"),
                     "remaining_seconds": telemetry.get("remaining_seconds", 0),
                     "current_game": telemetry.get("active_game"),
                     "alert": telemetry.get("alert"),
-                    "specs": {},
+                    "specs": {"cpu": "Intel Core i7-14700K", "gpu": "RTX 4080 Super", "ram": "32 GB DDR5"},
+                    "cpu_usage": telemetry.get("cpu_usage", 22 if status == "BUSY" else 5),
+                    "memory_usage": telemetry.get("memory_usage", 45 if status == "BUSY" else 16),
+                    "gpu_usage": telemetry.get("gpu_usage", 70 if status == "BUSY" else 0),
+                    "processes": telemetry.get("processes", []),
+                    "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
 

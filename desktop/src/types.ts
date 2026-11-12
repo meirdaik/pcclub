@@ -118,6 +118,8 @@ export interface ElectronAPI {
   setKioskLocked: (locked: boolean) => void;
   killGameProcesses: () => Promise<{ success: boolean }>;
   openExternal: (url: string) => void;
+  systemReboot?: () => Promise<{ success: boolean }>;
+  systemShutdown?: () => Promise<{ success: boolean }>;
   exitKiosk: () => void;
 }
 
