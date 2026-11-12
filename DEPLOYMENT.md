@@ -108,27 +108,37 @@ The client includes an **In-App Browser** (`IN-APP BROWSER (RUNS INSIDE)`) suppo
 
 ---
 
-## 👩‍💼 Step 3: Cashier & Staff Control Panel
+## 👩‍💼 Step 3: Dedicated Cashier / Admin Desktop App (`admin-desktop`)
 
-Cashiers and administrators have two ways to manage the club:
+We provide a dedicated **Admin Management Desktop App** (`admin-desktop`) designed for the cashier desk, owner's laptop, or administrative workstation:
 
-### 1. From the Kiosk Lock Screen
-Click **`🖥️ CASHIER MAP`** in the top-right corner of the Lock Screen or log in with username:
-- **Username:** `admin`
-- **Password:** `admin123` (or any password in local dev mode)
+### 1. Launching on the Cash Desk PC
+- Standalone Portable Executable:
+  ```
+  admin-desktop\release\PCClub-Admin-Setup.exe
+  ```
+- Or unpacked folder:
+  ```
+  admin-desktop\release\win-unpacked\PC Club Admin Console.exe
+  ```
+- Configure `config.json` next to the executable (or click **`⚙️ Server`** inside the app):
+  ```json
+  {
+    "serverIp": "10.72.49.124",
+    "serverPort": 8000,
+    "clubName": "CYBER ARENA CLUB",
+    "cashierName": "Operator"
+  }
+  ```
 
-### 2. From Any Browser on the LAN
-Navigate to:
-```
-http://<SERVER_IP>:8000/
-```
-Or open the Cashier Map view.
-
-### Cashier Capabilities:
-- **Live Visual Grid:** Free (Green), Busy (Red with countdown timer & active player), Offline (Gray).
-- **Remote Unlock:** Click any Free or Offline station, choose duration (+1h, +2h, +3h, Night Pass), and remotely unlock it instantly.
-- **Add Time:** Add +30m or +1h to an active session with one click.
-- **Force Lock:** Immediately terminate the session, close running games via `taskkill`, and return the PC to the locked kiosk screen.
+### 2. Cashier Console Features
+- **Real-Time Interactive PC Grid:** Free (Green), Busy (Red with live countdown), Alert (Pulsing Yellow), Offline (Gray).
+- **Remote Unlock:** Choose gamer username and tariff duration (+1h, +2h, +3h, Night Pass) to remotely start station sessions.
+- **Remote Add Time:** Extend sessions with 1 click (+30m, +1h).
+- **Force Lock & Process Killer:** Immediately kill game processes via Windows `taskkill` and restore the fullscreen lock shield.
+- **Hardware Telemetry & Process Monitoring:** Live CPU load, RAM usage, GPU utilization, and active game process names reported over LAN.
+- **Remote Power Control:** Initiate remote **Reboot** or **Shutdown** on any client PC.
+- **Dispatch Alert Drawer:** Audio chime and live notification feed when any player presses "Call Admin" or orders food/snacks from their station.
 
 ---
 

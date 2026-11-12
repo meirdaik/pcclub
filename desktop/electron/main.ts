@@ -365,6 +365,22 @@ ipcMain.handle('get-system-stats', async () => {
   };
 });
 
+ipcMain.handle('system-reboot', async () => {
+  console.log('[SENET IPC] Remote REBOOT executed by Club Admin...');
+  if (process.platform === 'win32') {
+    spawn('shutdown', ['/r', '/t', '5', '/c', 'Reboot initiated by Club Administrator'], { stdio: 'ignore' });
+  }
+  return { success: true };
+});
+
+ipcMain.handle('system-shutdown', async () => {
+  console.log('[SENET IPC] Remote SHUTDOWN executed by Club Admin...');
+  if (process.platform === 'win32') {
+    spawn('shutdown', ['/s', '/t', '5', '/c', 'Shutdown initiated by Club Administrator'], { stdio: 'ignore' });
+  }
+  return { success: true };
+});
+
 ipcMain.on('set-kiosk-mode', (_event, enabled: boolean) => {
   if (mainWindow) {
     console.log(`[SENET] Kiosk mode set to: ${enabled}`);

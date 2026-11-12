@@ -76,6 +76,16 @@ function App() {
             handleLock();
             break;
 
+          case 'REBOOT':
+            console.log('[SENET Socket] REBOOT command received from Club Admin');
+            window.electronAPI?.systemReboot?.();
+            break;
+
+          case 'SHUTDOWN':
+            console.log('[SENET Socket] SHUTDOWN command received from Club Admin');
+            window.electronAPI?.systemShutdown?.();
+            break;
+
           case 'EXTEND':
             if (message.remaining_seconds !== undefined) {
               setSession((prev) =>

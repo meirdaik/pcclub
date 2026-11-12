@@ -1,0 +1,8 @@
+{
+  "serverIp": "10.72.49.124",
+  "serverPort": 8000,
+  "clubName": "CYBER ARENA CLUB",
+  "cashierName": "Operator",
+  "authToken": "dev-pc-token",
+  "pollIntervalMs": 2000
+}

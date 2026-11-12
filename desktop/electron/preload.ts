@@ -11,5 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setKioskLocked: (locked: boolean) => ipcRenderer.send('set-kiosk-locked', locked),
   killGameProcesses: () => ipcRenderer.invoke('kill-game-processes'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+  systemReboot: () => ipcRenderer.invoke('system-reboot'),
+  systemShutdown: () => ipcRenderer.invoke('system-shutdown'),
   exitKiosk: () => ipcRenderer.send('exit-kiosk'),
 });
