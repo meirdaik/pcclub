@@ -4,8 +4,8 @@ Database selection:
   1. TEST_DATABASE_URL (environment or backend/.env). Its database name must contain "test"
      because the public schema is wiped at the start of the run.
   2. Otherwise an embedded throwaway server, if `pip install -e ".[embedded-pg]"` was done.
-     That server has no btree_gist, so migration 0002 (overlap constraints) is not applied
-     and tests marked `requires_overlap_constraints` are skipped.
+     That server has no btree_gist, so migration 0002 (overlap constraints) is skipped (the
+     later migrations still run) and tests marked `requires_overlap_constraints` are skipped.
   3. Otherwise all integration tests are skipped.
 
 Each test runs inside one outer transaction that is rolled back; application commits become
@@ -110,8 +110,12 @@ def database(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Database]:
 
     try:
         has_btree_gist = asyncio.run(_reset_schema(url))
-        # Without btree_gist (embedded server) stop before the exclusion-constraint migration.
-        command.upgrade(alembic_config(url), "head" if has_btree_gist else "0001")
+        config = alembic_config(url)
+        if not has_btree_gist:
+            # Embedded server: skip only the exclusion-constraint migration, apply the rest.
+            command.upgrade(config, "0001")
+            command.stamp(config, "0002")
+        command.upgrade(config, "head")
         yield Database(url=url, has_overlap_constraints=has_btree_gist)
     finally:
         if server is not None:

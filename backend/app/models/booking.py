@@ -75,6 +75,10 @@ class Booking(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     hold_expires_at: Mapped[datetime | None] = mapped_column(tz_datetime)
     price_kzt: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Set when the end time and price came from a package instead of the hourly rate.
+    package_id: Mapped[uuid.UUID | None] = mapped_column(
+        uuid_fk_type, ForeignKey("packages.id", ondelete="RESTRICT")
+    )
     created_at: Mapped[datetime] = created_at_column()
     cancelled_at: Mapped[datetime | None] = mapped_column(tz_datetime)
 

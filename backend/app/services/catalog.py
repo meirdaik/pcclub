@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.core.errors import AppError, not_found
-from app.models import Booking, BookingStatus, Club, Pc, PcStatus, StaffUser, Zone
+from app.domain.packages import window_overlaps_night
+from app.models import Booking, BookingStatus, Club, Package, Pc, PcStatus, StaffUser, Zone
 from app.schemas.club import (
     BusyInterval,
     ClubCreate,
     ClubUpdate,
+    PackageOut,
     PcAvailabilityOut,
     PcCreate,
     PcOut,
@@ -98,6 +100,48 @@ async def list_pcs(
             available=available,
         )
         for pc, available in rows
+    ]
+
+
+async def list_packages(
+    session: AsyncSession,
+    club_id: uuid.UUID,
+    zone_id: uuid.UUID | None,
+    *,
+    night_start: time,
+    night_end: time,
+) -> list[PackageOut]:
+    """Active packages of a club's active zones, cheapest first within each zone."""
+    await get_active_club(session, club_id)
+    stmt = (
+        select(Package, Zone)
+        .join(Zone, Zone.id == Package.zone_id)
+        .where(Zone.club_id == club_id, Zone.is_active, Package.is_active)
+        .order_by(Zone.name, Package.price_kzt, Package.name)
+    )
+    if zone_id is not None:
+        stmt = stmt.where(Package.zone_id == zone_id)
+    return [
+        PackageOut(
+            id=package.id,
+            club_id=zone.club_id,
+            zone_id=zone.id,
+            zone_name=zone.name,
+            name=package.name,
+            kind=package.terms.kind,
+            duration_minutes=package.duration_minutes,
+            window_start=package.window_start,
+            window_end=package.window_end,
+            price_kzt=package.price_kzt,
+            is_night=(
+                package.window_start is not None
+                and package.window_end is not None
+                and window_overlaps_night(
+                    package.window_start, package.window_end, night_start, night_end
+                )
+            ),
+        )
+        for package, zone in await session.execute(stmt)
     ]
 
 

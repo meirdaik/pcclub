@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core import security
 from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
-from app.models import Club, Organization, Pc, StaffRole, StaffUser, Zone
+from app.models import Club, Organization, Package, Pc, StaffRole, StaffUser, Zone
 
 
 async def create_owner(org_name: str, email: str, password: str) -> None:
@@ -74,8 +74,57 @@ async def seed_demo() -> None:
             + [Pc(club_id=club.id, zone_id=vip.id, label=f"VIP-{n:02d}") for n in range(1, 5)]
             + [Pc(club_id=daytime.id, zone_id=day.id, label=f"D-{n:02d}") for n in range(1, 5)]
         )
+        # Made-up demo packages in the usual cyber-club shape: hour bundles plus morning, day
+        # and night windows. The night window is 18+ (it lies inside 22:00-06:00).
+        session.add_all(
+            [
+                Package(zone_id=standard.id, name="3 часа", duration_minutes=180, price_kzt=2000),
+                Package(zone_id=standard.id, name="5 часов", duration_minutes=300, price_kzt=3200),
+                Package(
+                    zone_id=standard.id,
+                    name="Утро",
+                    window_start=time(8),
+                    window_end=time(13),
+                    price_kzt=2000,
+                ),
+                Package(
+                    zone_id=standard.id,
+                    name="День",
+                    window_start=time(13),
+                    window_end=time(18),
+                    price_kzt=2800,
+                ),
+                Package(
+                    zone_id=standard.id,
+                    name="Ночь",
+                    window_start=time(22),
+                    window_end=time(8),
+                    price_kzt=3500,
+                ),
+                Package(zone_id=vip.id, name="3 часа", duration_minutes=180, price_kzt=3800),
+                Package(zone_id=vip.id, name="5 часов", duration_minutes=300, price_kzt=6000),
+                Package(
+                    zone_id=vip.id,
+                    name="Ночь",
+                    window_start=time(22),
+                    window_end=time(8),
+                    price_kzt=6500,
+                ),
+                Package(zone_id=day.id, name="3 часа", duration_minutes=180, price_kzt=1800),
+                Package(
+                    zone_id=day.id,
+                    name="День",
+                    window_start=time(10),
+                    window_end=time(17),
+                    price_kzt=3500,
+                ),
+            ]
+        )
         await session.commit()
-    print("Seeded demo clubs: Demo Arena (Almaty, 24/7), Demo Daytime (Astana, 10:00-23:00)")
+    print(
+        "Seeded demo clubs with hourly prices and packages: "
+        "Demo Arena (Almaty, 24/7), Demo Daytime (Astana, 10:00-23:00)"
+    )
 
 
 async def _run(args: argparse.Namespace) -> None:

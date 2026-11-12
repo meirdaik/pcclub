@@ -84,7 +84,7 @@ backend/app/
   main.py            app factory, router wiring
   cli.py             operator commands
   core/              config, db session, security (JWT, hashing, IIN crypto), errors, clock
-  domain/            PURE business rules: iin, age_rule, slots, pricing, phone
+  domain/            PURE business rules: iin, age_rule, slots, pricing, packages, phone
   models/            SQLAlchemy models (import new ones in models/__init__.py)
   schemas/           Pydantic request/response models
   integrations/      external services behind Protocols + mocks, wired in registry.py
@@ -92,7 +92,7 @@ backend/app/
   services/          use-cases; own the transaction (commit here)
   api/deps.py        FastAPI dependencies (session, clock, current user/staff, providers)
   api/v1/            thin routers; api/v1/admin/ for staff endpoints
-backend/alembic/versions/   0001 schema, 0002 booking overlap constraints
+backend/alembic/versions/   0001 schema, 0002 booking overlap constraints, 0003 packages
 backend/tests/unit/         domain tests
 backend/tests/integration/  API tests against real PostgreSQL (see conftest.py docstring)
 ```
@@ -143,6 +143,19 @@ birth date returned by the `IdentityVerifier` is authoritative and must match th
   `can_play_at()` is the single-instant form for the future PC client (session start, forced
   logout at 22:00).
 
+**Packages** (`domain/packages.py`, `models/club.Package`): a fixed-price block of time in one
+zone, either a duration ("3 hours") or a daily club-local window ("Night 22:00-08:00"; an end
+that is not after the start crosses midnight).
+- `POST /v1/bookings` takes either `ends_at` (hourly price) or `package_id`, never both. With a
+  package, `package_end()` sets the end (duration from the start, or the end of the window the
+  start lies in) and the booking costs the package's `price_kzt`, whenever it starts.
+- A package only supplies the end and the price. The interval then goes through the same slot,
+  opening-hours, age-rule and overlap checks as an hourly booking, so a night package gives a
+  minor no way around `[22:00, 06:00)`. Do not add a second age check keyed on the package.
+- `is_night` in `GET /v1/clubs/{id}/packages` is only a label ("18+"), derived by
+  `window_overlaps_night()` from the window and the configured night hours; it is not stored.
+- Errors: `OUTSIDE_PACKAGE_WINDOW` (422), `PACKAGE_NOT_FOR_PC` (422, package of another zone).
+
 **Booking lifecycle** (`services/booking.py`, `services/payment.py`):
 
 ```
@@ -192,7 +205,7 @@ identity with `POST /v1/me/identity`. Staff use email + password. Both get a JWT
 
 Known gaps to pick up later: no rate limiting beyond the OTP cooldown; refunds that fail are only
 flagged (`payments.raw.refund_required`); bookings never move to `completed`/`no_show` yet
-(needs sessions from phase 4); no tariffs/packages, only an hourly zone price.
+(needs sessions from phase 4); packages can only be created by `seed-demo` (no admin CRUD yet).
 
 ## graphify
 

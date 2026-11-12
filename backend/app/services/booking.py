@@ -20,6 +20,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.errors import AppError, not_found
 from app.domain.age_rule import violates_night_restriction
+from app.domain.packages import OutsidePackageWindow, package_end
 from app.domain.pricing import booking_price_kzt
 from app.domain.slots import InvalidSlot, OutsideOpeningHours, SlotRules, validate_slot
 from app.integrations.payments.base import PaymentProviderError
@@ -28,6 +29,7 @@ from app.models import (
     ACTIVE_BOOKING_STATUSES,
     Booking,
     BookingStatus,
+    Package,
     Payment,
     PaymentStatus,
     Pc,
@@ -88,10 +90,36 @@ async def create_booking(
         raise AppError("PC_UNAVAILABLE", "This PC cannot be booked", 409)
 
     tz = pc.club.tz
+    # A package only supplies the end time and the price. Its interval then goes through the
+    # same slot, opening-hours and age checks as an hourly booking: no way around the night rule.
+    ends_at = data.ends_at
+    package: Package | None = None
+    if data.package_id is not None:
+        package = await session.get(Package, data.package_id)
+        if package is None or not package.is_active:
+            raise not_found("Package")
+        if package.zone_id != pc.zone_id:
+            raise AppError("PACKAGE_NOT_FOR_PC", "This package is sold for another zone", 422)
+        try:
+            ends_at = package_end(package.terms, data.starts_at, tz)
+        except OutsidePackageWindow as exc:
+            assert package.window_start is not None and package.window_end is not None
+            raise AppError(
+                "OUTSIDE_PACKAGE_WINDOW",
+                str(exc),
+                422,
+                {
+                    "window_start": package.window_start.isoformat(timespec="minutes"),
+                    "window_end": package.window_end.isoformat(timespec="minutes"),
+                    "timezone": pc.club.timezone,
+                },
+            ) from exc
+    assert ends_at is not None  # BookingCreate requires ends_at or package_id
+
     try:
         validate_slot(
             data.starts_at,
-            data.ends_at,
+            ends_at,
             now=now,
             tz=tz,
             rules=SlotRules(
@@ -111,7 +139,7 @@ async def create_booking(
     if violates_night_restriction(
         user.birth_date,
         data.starts_at,
-        data.ends_at,
+        ends_at,
         tz,
         adult_age=settings.adult_age,
         night_start=settings.night_start,
@@ -136,10 +164,15 @@ async def create_booking(
         pc_id=pc.id,
         club_id=pc.club_id,
         starts_at=data.starts_at,
-        ends_at=data.ends_at,
+        ends_at=ends_at,
         status=BookingStatus.PENDING_PAYMENT,
         hold_expires_at=now + timedelta(minutes=settings.booking_hold_minutes),
-        price_kzt=booking_price_kzt(pc.zone.price_per_hour_kzt, data.starts_at, data.ends_at),
+        price_kzt=(
+            package.price_kzt
+            if package is not None
+            else booking_price_kzt(pc.zone.price_per_hour_kzt, data.starts_at, ends_at)
+        ),
+        package_id=package.id if package is not None else None,
     )
     try:
         async with session.begin_nested():

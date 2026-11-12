@@ -71,13 +71,16 @@ async def book(
     pc_id: uuid.UUID,
     start: datetime,
     end: datetime | None = None,
+    *,
+    package_id: uuid.UUID | None = None,
 ) -> httpx.Response:
-    end = end or start + timedelta(hours=2)
-    return await client.post(
-        "/v1/bookings",
-        headers=headers,
-        json={"pc_id": str(pc_id), "starts_at": start.isoformat(), "ends_at": end.isoformat()},
-    )
+    """Book hourly until `end` (default: 2 hours), or with a package that decides the end."""
+    body = {"pc_id": str(pc_id), "starts_at": start.isoformat()}
+    if package_id is not None:
+        body["package_id"] = str(package_id)
+    else:
+        body["ends_at"] = (end or start + timedelta(hours=2)).isoformat()
+    return await client.post("/v1/bookings", headers=headers, json=body)
 
 
 async def pay(
