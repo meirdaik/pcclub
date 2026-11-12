@@ -1,15 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { socketService } from './services/socket';
-import { initAppConfig } from './services/config';
+import { getAppConfig, initAppConfig } from './services/config';
 import { AppState, SessionInfo, ServerMessage } from './types';
 import LockScreen from './screens/LockScreen';
 import Dashboard from './screens/Dashboard';
 import AdminPanel from './screens/AdminPanel';
+import AdminPinModal from './components/AdminPinModal';
+import ConnectionSetupModal from './components/ConnectionSetupModal';
 
 function App() {
   const [appState, setAppState] = useState<AppState>('locked');
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [broadcastPopup, setBroadcastPopup] = useState<{ title: string; message: string } | null>(null);
+  const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
+  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
 
   const handleLock = useCallback(async () => {
     console.log('[SENET] Session ended or locked -> Activating Kiosk Shield...');
@@ -23,8 +27,13 @@ function App() {
       }
     }
 
-    // 2. Lock kiosk keyboard shortcuts
+    // 2. Lock kiosk keyboard shortcuts & hide in-game HUD
     window.electronAPI?.setKioskLocked(true);
+    window.electronAPI?.updateHudState?.({
+      pcLabel: getAppConfig().pcLabel,
+      remainingSeconds: 0,
+      username: '',
+    });
 
     // 3. Update telemetry state
     socketService.updateSessionTelemetry('LOCKED', 0, null, null);
@@ -35,6 +44,12 @@ function App() {
 
   const handleUnlock = useCallback((sessionInfo: SessionInfo) => {
     setSession(sessionInfo);
+
+    window.electronAPI?.updateHudState?.({
+      pcLabel: getAppConfig().pcLabel,
+      remainingSeconds: sessionInfo.remainingSeconds,
+      username: sessionInfo.username,
+    });
 
     if (sessionInfo.isAdmin || sessionInfo.username.toLowerCase() === 'admin') {
       console.log('[SENET] Admin session authenticated -> Loading Cashier Control Map...');
@@ -116,8 +131,27 @@ function App() {
       });
     });
 
+    const unregPin = window.electronAPI?.onOpenAdminPinModal?.(() => {
+      setIsAdminPinModalOpen(true);
+    });
+    const unregSetup = window.electronAPI?.onOpenSetupModal?.(() => {
+      setIsSetupModalOpen(true);
+    });
+    const unregHud = window.electronAPI?.onHudAction?.((action) => {
+      if (action === 'call-admin') {
+        socketService.sendCallAdmin('Player requested assistance via In-Game Floating HUD');
+      } else if (action === 'end-session') {
+        if (confirm('Finish your gaming session and lock the PC?')) {
+          handleLock();
+        }
+      }
+    });
+
     return () => {
       unsubscribe();
+      unregPin?.();
+      unregSetup?.();
+      unregHud?.();
       socketService.disconnect();
     };
   }, [handleLock, handleUnlock]);
@@ -205,6 +239,22 @@ function App() {
             </button>
           </div>
         </div>
+      )}
+      {/* Admin Maintenance PIN Modal (Ctrl+Shift+A / Ctrl+Shift+Q) */}
+      {isAdminPinModalOpen && (
+        <AdminPinModal onClose={() => setIsAdminPinModalOpen(false)} />
+      )}
+
+      {/* Connection & Station Setup Modal (Ctrl+Shift+S) */}
+      {isSetupModalOpen && (
+        <ConnectionSetupModal
+          onClose={() => setIsSetupModalOpen(false)}
+          onSaved={() => {
+            initAppConfig().then(() => {
+              socketService.reconnectWithConfig();
+            });
+          }}
+        />
       )}
     </div>
   );

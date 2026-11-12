@@ -69,14 +69,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="PC Club API", version="0.1.0", lifespan=_lifespan)
     register_error_handlers(app)
 
-    # Tokens travel in the Authorization header, never in cookies, so no credentials.
-    if origin_regex := _cors_origin_regex(settings):
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origin_regex=origin_regex,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    # Dev and LAN default: allow all origins so local LAN PCs, Electron Kiosks, and Expo apps connect cleanly
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     v1 = APIRouter(prefix="/v1")
     for module in (auth, me, clubs, bookings, admin_auth, admin_clubs):

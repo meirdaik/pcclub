@@ -3,11 +3,33 @@ import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { shellManager } from './shellManager';
+import { hudManager } from './hudManager';
+
+// Crash-proof global process exception handlers
+process.on('uncaughtException', (err) => {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(path.join(logDir, 'crash.log'), `[${new Date().toISOString()}] UncaughtException: ${err?.stack || err}\n`);
+  } catch {}
+  console.error('[SENET Crash Guard] Handled uncaught exception safely:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(path.join(logDir, 'crash.log'), `[${new Date().toISOString()}] UnhandledRejection: ${reason}\n`);
+  } catch {}
+  console.error('[SENET Crash Guard] Handled unhandled rejection safely:', reason);
+});
 
 let mainWindow: BrowserWindow | null = null;
 let isKioskLocked = true;
 let isMaintenanceMode = false;
 let isAppQuitting = false;
+let isAdminAuthorizedExit = false;
 let lastCpuInfo = os.cpus();
 const trackedPids = new Set<number>();
 
@@ -393,21 +415,26 @@ function setMaintenanceMode(enabled: boolean): void {
   isMaintenanceMode = enabled;
   applyRegistryLockdown(!enabled);
 
-  if (mainWindow) {
-    if (enabled) {
+  if (enabled) {
+    shellManager.restoreExplorer();
+    hudManager.hide();
+    if (mainWindow) {
       mainWindow.setKiosk(false);
       mainWindow.setAlwaysOnTop(false);
       mainWindow.setFullScreen(false);
       mainWindow.minimize();
-      console.log('[SENET Maintenance] Maintenance Mode ACTIVATED (Kiosk unlocked for technician)');
-    } else {
+    }
+    console.log('[SENET Maintenance] Maintenance Mode ACTIVATED (Windows Explorer restored for technician)');
+  } else {
+    shellManager.killExplorer();
+    if (mainWindow) {
       mainWindow.restore();
       mainWindow.setKiosk(true);
-      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
       mainWindow.setFullScreen(true);
       mainWindow.focus();
-      console.log('[SENET Maintenance] Kiosk Protection Mode RESTORED');
     }
+    console.log('[SENET Maintenance] Kiosk Protection Mode RESTORED (Windows Explorer terminated)');
   }
 }
 
@@ -432,20 +459,72 @@ function createWindow(): void {
     },
   });
 
-  // Lock escape combinations while in locked kiosk state (Ctrl+Shift+Q is preserved)
+  // Block window closing unless authorized admin exit
+  mainWindow.on('close', (e) => {
+    if (!isAdminAuthorizedExit && !isMaintenanceMode) {
+      e.preventDefault();
+      console.log('[SENET Kiosk Guard] Blocked unauthorized window close attempt.');
+      mainWindow?.show();
+      mainWindow?.focus();
+      mainWindow?.setFullScreen(true);
+      mainWindow?.setKiosk(true);
+    }
+  });
+
+  mainWindow.on('blur', () => {
+    if (isKioskLocked && !isMaintenanceMode && mainWindow && !mainWindow.isDestroyed()) {
+      setTimeout(() => {
+        try {
+          mainWindow?.focus();
+          mainWindow?.moveTop();
+        } catch {}
+      }, 50);
+    }
+  });
+
+  mainWindow.on('unresponsive', () => {
+    console.warn('[SENET Watchdog] Main window became unresponsive -> Reloading...');
+    mainWindow?.reload();
+  });
+
+  // Intercept all keyboard combinations
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    // Preserve emergency developer exit: Ctrl+Shift+Q
+    // Block standard dev & browser keys
     if (
-      (input.control || input.meta) &&
-      input.shift &&
-      input.key.toLowerCase() === 'q'
+      input.key === 'F5' ||
+      input.key === 'F11' ||
+      input.key === 'F12' ||
+      (input.control && (input.key === 'r' || input.key === 'R' || input.key === 'w' || input.key === 'W')) ||
+      (input.control && input.shift && (input.key === 'i' || input.key === 'I'))
     ) {
+      event.preventDefault();
       return;
     }
 
-    // When kiosk is locked, prevent Alt+F4, Alt+Tab, Windows Key, and Ctrl+Esc
+    // Ctrl+Shift+A -> Open Admin Maintenance PIN Modal
+    if ((input.control || input.meta) && input.shift && (input.key === 'a' || input.key === 'A')) {
+      event.preventDefault();
+      mainWindow?.webContents.send('open-admin-pin-modal');
+      return;
+    }
+
+    // Ctrl+Shift+S -> Open Connection Setup Modal
+    if ((input.control || input.meta) && input.shift && (input.key === 's' || input.key === 'S')) {
+      event.preventDefault();
+      mainWindow?.webContents.send('open-setup-modal');
+      return;
+    }
+
+    // Ctrl+Shift+Q -> Emergency Admin PIN Modal
+    if ((input.control || input.meta) && input.shift && (input.key === 'q' || input.key === 'Q')) {
+      event.preventDefault();
+      mainWindow?.webContents.send('open-admin-pin-modal');
+      return;
+    }
+
+    // When kiosk is locked, block Alt+F4, Alt+Tab, Alt+Space, Windows Key, Ctrl+Esc
     if (isKioskLocked) {
-      if (input.key === 'Alt' || (input.alt && (input.key === 'F4' || input.key === 'Tab'))) {
+      if (input.alt && (input.key === 'F4' || input.key === 'Tab' || input.key === ' ')) {
         event.preventDefault();
       }
       if (input.key === 'Meta' || input.key === 'OS' || (input.control && input.key === 'Escape')) {
@@ -758,12 +837,54 @@ ipcMain.handle('clean-session-data', async () => {
 
 ipcMain.on('set-kiosk-locked', (_event, locked: boolean) => {
   isKioskLocked = locked;
-  if (mainWindow) {
-    mainWindow.setKiosk(locked);
-    mainWindow.setAlwaysOnTop(locked, locked ? 'screen-saver' : 'normal');
-    if (locked) {
+  if (locked) {
+    hudManager.hide();
+    if (mainWindow && !isMaintenanceMode) {
+      mainWindow.setKiosk(true);
+      mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
       mainWindow.focus();
     }
+  } else {
+    // Session is active:
+    // Windows Explorer stays killed (PCClub is the sole desktop shell),
+    // but mainWindow lets external launched games appear above it.
+    if (mainWindow) {
+      mainWindow.setAlwaysOnTop(false);
+    }
+    hudManager.show();
+  }
+});
+
+ipcMain.handle('admin-unlock-to-windows', async (_event, pin: string) => {
+  const cleanPin = String(pin || '').trim();
+  const validPins = ['admin123', '9999', 'admin'];
+  if (validPins.includes(cleanPin)) {
+    console.log('[SENET Auth] Admin PIN authenticated! Restoring Windows Explorer & Desktop...');
+    isAdminAuthorizedExit = true;
+    await shellManager.restoreExplorer();
+    applyRegistryLockdown(false);
+    isMaintenanceMode = true;
+    hudManager.hide();
+    if (mainWindow) {
+      mainWindow.setKiosk(false);
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.setFullScreen(false);
+      mainWindow.minimize();
+    }
+    return { success: true };
+  }
+  return { success: false, error: 'Incorrect Admin PIN' };
+});
+
+ipcMain.on('update-hud-state', (_event, state) => {
+  hudManager.updateState(state);
+});
+
+ipcMain.on('return-to-launcher', () => {
+  if (mainWindow) {
+    mainWindow.restore();
+    mainWindow.focus();
+    mainWindow.moveTop();
   }
 });
 
@@ -885,6 +1006,21 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  // Create HUD overlay bar
+  hudManager.createHudWindow((action) => {
+    if (action === 'return-launcher') {
+      if (mainWindow) {
+        mainWindow.restore();
+        mainWindow.focus();
+        mainWindow.moveTop();
+      }
+    } else if (action === 'call-admin') {
+      mainWindow?.webContents.send('hud-action-received', 'call-admin');
+    } else if (action === 'end-session') {
+      mainWindow?.webContents.send('hud-action-received', 'end-session');
+    }
+  });
+
   // Record active executable path for Windows SYSTEM guard watchdog service
   try {
     const pDir = 'C:\\ProgramData\\PCClub';
@@ -894,14 +1030,38 @@ app.whenReady().then(() => {
     console.warn('[SENET Path] Could not record kiosk-path:', err);
   }
 
-  // Apply registry protection on boot unless technician maintenance flag is present
+  const isWindowed = process.argv.includes('--windowed') || process.env.WINDOWED === 'true';
+  const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
+
+  // Apply shell takeover and registry protection unless technician maintenance flag is present
   const flagPath = 'C:\\ProgramData\\PCClub\\maintenance.flag';
   if (fs.existsSync(flagPath)) {
     isMaintenanceMode = true;
-    console.log('[SENET Startup] Maintenance mode flag detected, skipping registry lockdown.');
-  } else {
+    console.log('[SENET Startup] Maintenance mode flag detected, skipping shell takeover.');
+  } else if (!isWindowed && !isDev) {
+    console.log('[SENET Startup] Kiosk mode: executing explorer.exe takeover and registry lockdown...');
+    shellManager.killExplorer();
     applyRegistryLockdown(true);
+  } else {
+    console.log('[SENET Startup] Running in windowed/dev mode: skipping explorer.exe termination.');
   }
+
+  // Aggressive focus loop when locked
+  setInterval(() => {
+    if (isKioskLocked && mainWindow && !mainWindow.isDestroyed() && !isMaintenanceMode) {
+      try {
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        mainWindow.setKiosk(true);
+        mainWindow.setFullScreen(true);
+        if (!mainWindow.isFocused()) {
+          mainWindow.focus();
+        }
+      } catch {}
+    }
+  }, 400);
 
   // Register safe developer emergency exit shortcut: Ctrl+Shift+Q
   globalShortcut.register('CommandOrControl+Shift+Q', () => {

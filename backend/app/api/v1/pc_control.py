@@ -507,8 +507,8 @@ async def transfer_pc_session(
         await session.commit()
 
     # 2. Lock Source Station
-    await manager.send_command(from_pc_id, "LOCK")
-    if from_pc:
+    sent_lock = await manager.send_command(from_pc_id, "LOCK")
+    if not sent_lock and from_pc:
         await manager.send_command(str(from_pc.id), "LOCK")
     manager.update_telemetry(
         from_pc_id,
@@ -528,8 +528,8 @@ async def transfer_pc_session(
         "balance": user.balance_kzt if user else 5000,
         "transferred_from": from_pc_id,
     }
-    await manager.send_command(to_pc_id, "UNLOCK", unlock_payload)
-    if to_pc:
+    sent_unlock = await manager.send_command(to_pc_id, "UNLOCK", unlock_payload)
+    if not sent_unlock and to_pc:
         await manager.send_command(str(to_pc.id), "UNLOCK", unlock_payload)
     manager.update_telemetry(
         to_pc_id,

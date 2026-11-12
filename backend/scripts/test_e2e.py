@@ -32,8 +32,13 @@ def http_post(path: str, data: dict | None = None) -> dict:
         headers={"Content-Type": "application/json", "Accept": "application/json"},
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=5) as res:
-        return json.loads(res.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            return json.loads(res.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        print(f"HTTP ERROR {e.code} on POST {path}: {err_body}")
+        raise
 
 async def run_e2e():
     print("=" * 65)

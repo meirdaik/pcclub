@@ -7,7 +7,28 @@ class AdminApiClient {
   }
 
   async testConnection(testUrl?: string): Promise<boolean> {
-    const url = testUrl || this.baseUrl;
+    const url = (testUrl || this.baseUrl).replace(/\/+$/, '');
+    // Try system info first (lightweight, zero DB load)
+    try {
+      const resp = await fetch(`${url}/api/system/info`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (resp.ok) return true;
+    } catch {}
+
+    // Fallback to health endpoint
+    try {
+      const resp = await fetch(`${url}/health`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (resp.ok) return true;
+    } catch {}
+
+    // Fallback to admin pcs endpoint
     try {
       const resp = await fetch(`${url}/api/admin/pcs`, {
         method: 'GET',

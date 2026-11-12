@@ -21,24 +21,55 @@ logger = logging.getLogger("pcclub.pc_ws")
 
 
 async def _resolve_pc(session: AsyncSession, pc_identifier: str) -> Pc | None:
-    """Resolve PC by UUID or by label (e.g. 'PC #1' or 'pc-001')."""
+    """Resolve PC by UUID or by flexible label/id (e.g. 'PC #1', 'pc-001', 'pc-1', '1')."""
+    if not pc_identifier:
+        return None
     try:
         pc_uuid = uuid.UUID(pc_identifier)
         pc = await session.get(Pc, pc_uuid)
         if pc is not None:
             return pc
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         pass
 
-    # Search by label
+    # Direct label match
     stmt = select(Pc).where(
         or_(
             Pc.label == pc_identifier,
             func.lower(Pc.label) == pc_identifier.lower(),
         )
     )
-    result = await session.scalars(stmt)
-    return result.first()
+    result = (await session.scalars(stmt)).first()
+    if result:
+        return result
+
+    # Flexible numeric pattern matching (e.g. 'pc-001' or 'pc-1' -> 'PC #1')
+    import re
+    m = re.search(r"\d+", pc_identifier)
+    if m:
+        num = int(m.group())
+        possible_labels = [
+            f"PC #{num}",
+            f"PC #{num:02d}",
+            f"PC #{num:03d}",
+            f"PC-{num}",
+            f"PC-{num:02d}",
+            f"PC-{num:03d}",
+            f"PC {num}",
+            f"pc-{num}",
+            f"pc-{num:02d}",
+            f"pc-{num:03d}",
+            str(num),
+        ]
+        stmt = select(Pc).where(
+            or_(
+                Pc.label.in_(possible_labels),
+                func.lower(Pc.label).in_([p.lower() for p in possible_labels]),
+            )
+        )
+        return (await session.scalars(stmt)).first()
+
+    return None
 
 
 @router.websocket("/ws/pc/{pc_id}")
@@ -91,8 +122,11 @@ async def pc_websocket(
     # ------------------------------------------------------------------
     await manager.connect(pc_key, ws)
     if pc is not None:
-        # Also map the DB UUID so unlock via UUID reaches this connection
+        # Also map the DB UUID and label so unlock/transfer reaches this connection
         await manager.alias(str(pc.id), pc_key)
+        await manager.alias(pc.label, pc_key)
+        await manager.alias(pc.label.lower(), pc_key)
+        await manager.alias(pc_key, str(pc.id))
 
     await ws.send_json({"type": "auth_ok"})
     logger.info("PC %s: authenticated and connected", pc_key)
@@ -114,11 +148,14 @@ async def pc_websocket(
         )
         active_sess = (await session.scalars(stmt)).first()
         if active_sess is not None:
-            # Recalculate remaining seconds
+            # Recalculate remaining seconds safely (SQLite stores offset-naive datetimes)
+            def _to_utc(dt: datetime) -> datetime:
+                return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+
             if active_sess.end_time:
-                remaining_sec = int((active_sess.end_time - now_utc).total_seconds())
+                remaining_sec = int((_to_utc(active_sess.end_time) - now_utc).total_seconds())
             else:
-                elapsed = int((now_utc - active_sess.start_time).total_seconds())
+                elapsed = int((now_utc - _to_utc(active_sess.start_time)).total_seconds())
                 remaining_sec = max(0, active_sess.remaining_seconds - elapsed)
 
             if remaining_sec > 5:

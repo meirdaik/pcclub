@@ -155,6 +155,12 @@ export interface ElectronAPI {
   systemReboot?: () => Promise<{ success: boolean }>;
   systemShutdown?: () => Promise<{ success: boolean }>;
   exitKiosk: () => void;
+  adminUnlockToWindows?: (pin: string) => Promise<{ success: boolean; error?: string }>;
+  updateHudState?: (state: { pcLabel?: string; remainingSeconds?: number; username?: string }) => void;
+  returnToLauncher?: () => void;
+  onOpenAdminPinModal?: (callback: () => void) => () => void;
+  onOpenSetupModal?: (callback: () => void) => () => void;
+  onHudAction?: (callback: (action: string) => void) => () => void;
 }
 
 declare global {

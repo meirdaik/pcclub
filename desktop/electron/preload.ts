@@ -20,4 +20,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   systemReboot: () => ipcRenderer.invoke('system-reboot'),
   systemShutdown: () => ipcRenderer.invoke('system-shutdown'),
   exitKiosk: () => ipcRenderer.send('exit-kiosk'),
+  adminUnlockToWindows: (pin: string) => ipcRenderer.invoke('admin-unlock-to-windows', pin),
+  updateHudState: (state: any) => ipcRenderer.send('update-hud-state', state),
+  returnToLauncher: () => ipcRenderer.send('return-to-launcher'),
+  onOpenAdminPinModal: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('open-admin-pin-modal', handler);
+    return () => ipcRenderer.removeListener('open-admin-pin-modal', handler);
+  },
+  onOpenSetupModal: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('open-setup-modal', handler);
+    return () => ipcRenderer.removeListener('open-setup-modal', handler);
+  },
+  onHudAction: (callback: (action: string) => void) => {
+    const handler = (_event: any, action: string) => callback(action);
+    ipcRenderer.on('hud-action-received', handler);
+    return () => ipcRenderer.removeListener('hud-action-received', handler);
+  },
 });
