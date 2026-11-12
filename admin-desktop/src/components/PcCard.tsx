@@ -62,7 +62,7 @@ export default function PcCard({
     ? 'READY'
     : 'OFFLINE';
 
-  const isVip = pc.zone.toLowerCase().includes('vip');
+  const isVip = (pc.zone || '').toLowerCase().includes('vip');
 
   return (
     <div

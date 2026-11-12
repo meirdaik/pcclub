@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SessionInfo } from '../types';
-import { getAppConfig } from '../services/config';
+import { getAppConfig, initAppConfig } from '../services/config';
 import { socketService } from '../services/socket';
 import ConnectionSetupModal from '../components/ConnectionSetupModal';
 
@@ -25,6 +25,12 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
   const [loading, setLoading] = useState(false);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isWsConnected, setIsWsConnected] = useState(socketService.isConnected());
+
+  useEffect(() => {
+    initAppConfig().then((cfg) => {
+      setConfig(cfg);
+    });
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {

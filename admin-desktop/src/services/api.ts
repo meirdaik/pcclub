@@ -30,12 +30,27 @@ class AdminApiClient {
   }
 
   async fetchTariffs(): Promise<Tariff[]> {
-    const res = await fetch(`${this.baseUrl}/api/admin/tariffs`, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch tariffs`);
-    return res.json();
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/tariffs`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch tariffs`);
+      const data = await res.json();
+      return (data || []).map((t: any) => ({
+        ...t,
+        id: String(t.id || Math.random()),
+        name: t.name || 'Tariff',
+        zone: t.zone || t.zone_name || 'Standard',
+        zone_name: t.zone_name || t.zone || 'Standard',
+        duration_minutes: Number(t.duration_minutes) || 60,
+        price_kzt: Number(t.price_kzt) || 1000,
+        is_package: Boolean(t.is_package),
+      }));
+    } catch (e) {
+      console.warn('[Admin API] fetchTariffs error, returning empty list:', e);
+      return [];
+    }
   }
 
   async unlockPc(pcId: string, username: string, remainingSeconds: number, isVip = false): Promise<boolean> {

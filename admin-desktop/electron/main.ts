@@ -15,6 +15,10 @@ let mainWindow: BrowserWindow | null = null;
 
 function getConfigPath(): string {
   const candidates = [
+    ...(process.env.PORTABLE_EXECUTABLE_DIR
+      ? [path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'config.json')]
+      : []),
+    path.join(app.getPath('userData'), 'config.json'),
     path.join(path.dirname(process.execPath), 'config.json'),
     path.join(process.resourcesPath || '', 'config.json'),
     path.join(process.cwd(), 'config.json'),
@@ -26,13 +30,15 @@ function getConfigPath(): string {
     }
   }
   return app.isPackaged
-    ? path.join(path.dirname(process.execPath), 'config.json')
+    ? (process.env.PORTABLE_EXECUTABLE_DIR
+        ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'config.json')
+        : path.join(path.dirname(process.execPath), 'config.json'))
     : path.join(process.cwd(), 'config.json');
 }
 
 function loadAdminConfig(): AdminConfig {
   const defaultCfg: AdminConfig = {
-    serverIp: '10.72.49.124',
+    serverIp: '127.0.0.1',
     serverPort: 8000,
     clubName: 'CYBER ARENA CLUB',
     cashierName: 'Operator',

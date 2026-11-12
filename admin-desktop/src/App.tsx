@@ -102,7 +102,7 @@ export default function App() {
 
   // Quick Card Handlers
   const handleQuickUnlock = async (pc: ClubPc) => {
-    const isVip = pc.zone.toLowerCase().includes('vip');
+    const isVip = (pc.zone || '').toLowerCase().includes('vip');
     const ok = await api.unlockPc(pc.pc_id, 'player1', 3600, isVip);
     if (ok) {
       loadData();
@@ -139,7 +139,7 @@ export default function App() {
 
   // Modal Handlers
   const handleModalUnlock = async (pc: ClubPc, username: string, seconds: number) => {
-    const isVip = pc.zone.toLowerCase().includes('vip');
+    const isVip = (pc.zone || '').toLowerCase().includes('vip');
     const ok = await api.unlockPc(pc.pc_id, username, seconds, isVip);
     if (!ok) throw new Error('Unlock command failed');
     loadData();
@@ -173,7 +173,7 @@ export default function App() {
   const filteredPcs = pcs.filter((pc) => {
     // Zone filter
     if (filterZone !== 'ALL') {
-      if (!pc.zone.toUpperCase().includes(filterZone)) return false;
+      if (!(pc.zone || '').toUpperCase().includes(filterZone)) return false;
     }
     // Status filter
     if (filterStatus !== 'ALL') {
