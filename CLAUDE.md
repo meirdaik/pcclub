@@ -32,8 +32,8 @@ python -m venv .venv
 
 Config comes from environment variables or `backend/.env` (gitignored; see `.env.example`).
 `ENVIRONMENT=prod` refuses to start with dev secrets or a fixed OTP code.
-CORS is for browsers only (Expo web preview, later the admin panel): `http://localhost:*` is
-allowed in dev, nothing in test/prod unless `CORS_ALLOW_ORIGIN_REGEX` is set.
+CORS is for browsers only (Expo web preview, later the admin panel): `http://localhost:*` and
+private LAN addresses (`http://192.168.x.x`, `10.x`, `172.16-31.x`, for kiosk PCs) are allowed in dev, nothing in test/prod unless `CORS_ALLOW_ORIGIN_REGEX` is set.
 
 ## Commands (run from `mobile/`)
 

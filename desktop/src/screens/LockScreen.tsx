@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SessionInfo } from '../types';
+import { getAppConfig } from '../services/config';
 
-const PC_LABEL = import.meta.env.VITE_PC_LABEL || 'PC #1';
-const PC_ID = import.meta.env.VITE_PC_ID || 'pc-001';
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://127.0.0.1:8000';
 const MOBILE_APP_URL = import.meta.env.VITE_MOBILE_APP_URL || 'https://pcclub.kz/app';
 
 interface LockScreenProps {
@@ -13,6 +11,10 @@ interface LockScreenProps {
 }
 
 export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
+  const config = getAppConfig();
+  const pcLabel = config.pcLabel;
+  const pcId = config.pcId;
+  const serverUrl = config.serverUrl;
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [username, setUsername] = useState('');
@@ -60,12 +62,8 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
 
     try {
       const endpoints = [
-        `${SERVER_URL}/api/pc/${PC_ID}/unlock`,
-        `${SERVER_URL}/v1/pc/${PC_ID}/unlock`,
-        `http://127.0.0.1:8000/api/pc/${PC_ID}/unlock`,
-        `http://127.0.0.1:8000/v1/pc/${PC_ID}/unlock`,
-        `http://localhost:8000/api/pc/${PC_ID}/unlock`,
-        `http://localhost:8000/v1/pc/${PC_ID}/unlock`,
+        `${serverUrl}/api/pc/${pcId}/unlock`,
+        `${serverUrl}/v1/pc/${pcId}/unlock`,
       ];
 
       for (const endpoint of endpoints) {
@@ -123,13 +121,13 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
         <div className="glass-panel" style={styles.qrCard}>
           <div style={styles.kioskTitleBadge}>STATION LOCKED</div>
           <h1 className="cyber-glitch-text" style={styles.pcHeader}>
-            {PC_LABEL}
+            {pcLabel}
           </h1>
           <p style={styles.subText}>Scan with PC Club Mobile App to book and start instantly</p>
 
           <div style={styles.qrWrapper}>
             <QRCodeSVG
-              value={`${MOBILE_APP_URL}?pc_id=${encodeURIComponent(PC_ID)}`}
+              value={`${MOBILE_APP_URL}?pc_id=${encodeURIComponent(pcId)}`}
               size={180}
               bgColor="#070913"
               fgColor="#00f0ff"
@@ -198,7 +196,7 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
       <footer style={styles.footer}>
         <div style={styles.footerStatus}>
           <span style={styles.statusIndicator}></span>
-          <span>SYSTEM READY • TERMINAL #{PC_ID}</span>
+          <span>SYSTEM READY • TERMINAL #{pcId}</span>
         </div>
         <div style={styles.footerHotkeys}>
           Developer Exit: <kbd style={styles.kbd}>Ctrl</kbd> + <kbd style={styles.kbd}>Shift</kbd> + <kbd style={styles.kbd}>Q</kbd>

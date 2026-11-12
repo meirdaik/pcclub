@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AdminPcItem, AdminTariffItem } from '../types';
+import { getAppConfig } from '../services/config';
 
 interface AdminPanelProps {
   onExit: () => void;
 }
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://127.0.0.1:8000';
-
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
+  const config = getAppConfig();
+  const serverUrl = config.serverUrl;
   const [pcs, setPcs] = useState<AdminPcItem[]>([]);
   const [tariffs, setTariffs] = useState<AdminTariffItem[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'FREE' | 'BUSY' | 'ALERT' | 'VIP'>('ALL');
@@ -27,7 +28,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
   const fetchClubState = useCallback(async () => {
     try {
-      const res = await fetch(`${SERVER_URL}/api/admin/pcs`);
+      const res = await fetch(`${serverUrl}/api/admin/pcs`);
       if (res.ok) {
         const data = await res.json();
         setPcs(data);
@@ -37,11 +38,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [serverUrl]);
 
   const fetchTariffs = useCallback(async () => {
     try {
-      const res = await fetch(`${SERVER_URL}/api/admin/tariffs`);
+      const res = await fetch(`${serverUrl}/api/admin/tariffs`);
       if (res.ok) {
         const data = await res.json();
         setTariffs(data);
@@ -49,7 +50,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     } catch {
       // ignore
     }
-  }, []);
+  }, [serverUrl]);
 
   useEffect(() => {
     fetchClubState();
@@ -62,7 +63,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const handleRemoteUnlock = async (pcId: string, username: string, minutes: number) => {
     setActionLoading(`unlock-${pcId}`);
     try {
-      const res = await fetch(`${SERVER_URL}/api/pc/${pcId}/unlock`, {
+      const res = await fetch(`${serverUrl}/api/pc/${pcId}/unlock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,7 +91,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     if (!confirm(`Force lock station ${pcId}? Active game processes will be terminated.`)) return;
     setActionLoading(`lock-${pcId}`);
     try {
-      const res = await fetch(`${SERVER_URL}/api/pc/${pcId}/lock`, {
+      const res = await fetch(`${serverUrl}/api/pc/${pcId}/lock`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -111,7 +112,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const handleRemoteExtend = async (pcId: string, additionalMinutes: number) => {
     setActionLoading(`extend-${pcId}`);
     try {
-      const res = await fetch(`${SERVER_URL}/api/pc/${pcId}/extend`, {
+      const res = await fetch(`${serverUrl}/api/pc/${pcId}/extend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +135,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   // Clear Alert
   const handleClearAlert = async (pcId: string) => {
     try {
-      await fetch(`${SERVER_URL}/api/pc/${pcId}/clear-alert`, { method: 'POST' });
+      await fetch(`${serverUrl}/api/pc/${pcId}/clear-alert`, { method: 'POST' });
       showToast(`Alert cleared on ${pcId}`);
       fetchClubState();
     } catch {

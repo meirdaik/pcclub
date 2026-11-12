@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  getConfig: () => ipcRenderer.invoke('get-config'),
   launchApp: (exePathOrUri: string) => ipcRenderer.invoke('launch-app', exePathOrUri),
   getPcInfo: () => ipcRenderer.invoke('get-pc-info'),
   getSystemStats: () => ipcRenderer.invoke('get-system-stats'),

@@ -8,6 +8,107 @@ let mainWindow: BrowserWindow | null = null;
 let isKioskLocked = true;
 const trackedPids = new Set<number>();
 
+// ----------------------------------------------------------------------
+// Runtime Configuration (config.json)
+// ----------------------------------------------------------------------
+
+interface RuntimeConfig {
+  serverIp: string;
+  serverPort: number;
+  serverUrl: string;
+  wsUrl: string;
+  pcId: string;
+  pcNumber: number;
+  pcLabel: string;
+  authToken: string;
+}
+
+function loadAppConfig(): RuntimeConfig {
+  const candidatePaths = [
+    // 1. Next to the executable when packaged (e.g. C:\PCClubClient\config.json)
+    path.join(path.dirname(process.execPath), 'config.json'),
+    // 2. In electron extraResources folder
+    path.join(process.resourcesPath, 'config.json'),
+    // 3. Current working directory
+    path.join(process.cwd(), 'config.json'),
+    // 4. In desktop root (development)
+    path.join(__dirname, '../config.json'),
+    path.join(__dirname, 'config.json'),
+  ];
+
+  let rawConfig: Record<string, unknown> = {};
+  let resolvedPath: string | null = null;
+
+  for (const candidate of candidatePaths) {
+    try {
+      if (fs.existsSync(candidate)) {
+        const fileContent = fs.readFileSync(candidate, 'utf-8');
+        rawConfig = JSON.parse(fileContent);
+        resolvedPath = candidate;
+        console.log(`[SENET Config] Successfully loaded config from: ${candidate}`);
+        break;
+      }
+    } catch (err) {
+      console.warn(`[SENET Config] Could not parse config at ${candidate}:`, err);
+    }
+  }
+
+  const serverIp = String(rawConfig.serverIp || process.env.VITE_SERVER_IP || '127.0.0.1');
+  const serverPort = Number(rawConfig.serverPort || process.env.VITE_SERVER_PORT || 8000);
+  const pcNumber = Number(rawConfig.pcId || process.env.VITE_PC_NUMBER || 1);
+  const pcId =
+    typeof rawConfig.pcId === 'string' && rawConfig.pcId.startsWith('pc-')
+      ? rawConfig.pcId
+      : `pc-${String(pcNumber).padStart(3, '0')}`;
+  const pcLabel = String(rawConfig.pcLabel || `PC #${pcNumber}`);
+  const authToken = String(rawConfig.authToken || process.env.VITE_PC_AUTH_TOKEN || 'dev-pc-token');
+  const serverUrl = `http://${serverIp}:${serverPort}`;
+  const wsUrl = `ws://${serverIp}:${serverPort}`;
+
+  const config: RuntimeConfig = {
+    serverIp,
+    serverPort,
+    serverUrl,
+    wsUrl,
+    pcId,
+    pcNumber,
+    pcLabel,
+    authToken,
+  };
+
+  // If no config.json was found on disk, auto-generate template for club admin
+  if (!resolvedPath) {
+    try {
+      const templatePath = app.isPackaged
+        ? path.join(path.dirname(process.execPath), 'config.json')
+        : path.join(process.cwd(), 'config.json');
+
+      fs.writeFileSync(
+        templatePath,
+        JSON.stringify(
+          {
+            serverIp,
+            serverPort,
+            pcId: pcNumber,
+            pcLabel,
+            authToken,
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+      console.log(`[SENET Config] Generated default template config at: ${templatePath}`);
+    } catch {
+      // Ignore if filesystem is read-only
+    }
+  }
+
+  return config;
+}
+
+const appConfig = loadAppConfig();
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1920,
@@ -51,10 +152,28 @@ function createWindow(): void {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
   const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
+  const queryParams = new URLSearchParams({
+    pc_id: appConfig.pcId,
+    pc_label: appConfig.pcLabel,
+    server_ip: appConfig.serverIp,
+    server_port: String(appConfig.serverPort),
+    server_url: appConfig.serverUrl,
+    ws_url: appConfig.wsUrl,
+  }).toString();
+
   if (isDev) {
-    mainWindow.loadURL(devServerUrl);
+    mainWindow.loadURL(`${devServerUrl}?${queryParams}`);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
+      query: {
+        pc_id: appConfig.pcId,
+        pc_label: appConfig.pcLabel,
+        server_ip: appConfig.serverIp,
+        server_port: String(appConfig.serverPort),
+        server_url: appConfig.serverUrl,
+        ws_url: appConfig.wsUrl,
+      },
+    });
   }
 
   mainWindow.on('closed', () => {
@@ -65,6 +184,17 @@ function createWindow(): void {
 // ----------------------------------------------------------------------
 // IPC Handlers
 // ----------------------------------------------------------------------
+
+ipcMain.handle('get-config', () => {
+  return appConfig;
+});
+
+ipcMain.handle('get-pc-info', async () => {
+  return {
+    pcId: appConfig.pcId,
+    pcLabel: appConfig.pcLabel,
+  };
+});
 
 ipcMain.handle('launch-app', async (_event, targetPathOrUri: string) => {
   console.log(`[SENET IPC] Request to launch: ${targetPathOrUri}`);
@@ -219,21 +349,14 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   }
 });
 
-ipcMain.handle('get-pc-info', async () => {
-  return {
-    pcId: process.env.VITE_PC_ID || 'pc-001',
-    pcLabel: process.env.VITE_PC_LABEL || 'PC #1',
-  };
-});
-
 ipcMain.handle('get-system-stats', async () => {
   const totalMemGb = Math.round((os.totalmem() / 1024 / 1024 / 1024) * 10) / 10;
   const freeMemGb = Math.round((os.freemem() / 1024 / 1024 / 1024) * 10) / 10;
   const cpuModel = os.cpus()[0]?.model || 'Gaming Multi-Core Processor';
 
   return {
-    pcId: process.env.VITE_PC_ID || 'pc-001',
-    pcLabel: process.env.VITE_PC_LABEL || 'PC #1',
+    pcId: appConfig.pcId,
+    pcLabel: appConfig.pcLabel,
     hostname: os.hostname(),
     osRelease: `Windows ${os.release()}`,
     totalMemoryGb: totalMemGb,
@@ -276,8 +399,21 @@ ipcMain.on('exit-kiosk', () => {
 // ----------------------------------------------------------------------
 
 app.whenReady().then(() => {
-  // Allow all embedded web apps by stripping X-Frame-Options & CSP headers on main window
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+  // Use clean standard Chrome User-Agent across sessions to avoid Electron blocking by Telegram, Discord, Google
+  const CHROME_USER_AGENT =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+  session.defaultSession.setUserAgent(CHROME_USER_AGENT);
+
+  // Dedicated persistent session for the in-kiosk web browser (keeps player logins alive)
+  const browserSession = session.fromPartition('persist:senet_browser');
+  browserSession.setUserAgent(CHROME_USER_AGENT);
+
+  // Header stripper function allowing embedded web apps (Telegram, YouTube, Twitch, Discord)
+  const stripFrameHeaders = (
+    details: Electron.OnHeadersReceivedListenerDetails,
+    callback: (response: Electron.HeadersReceivedResponse) => void,
+  ) => {
     const responseHeaders = { ...details.responseHeaders };
     delete responseHeaders['x-frame-options'];
     delete responseHeaders['X-Frame-Options'];
@@ -286,22 +422,22 @@ app.whenReady().then(() => {
     delete responseHeaders['cross-origin-opener-policy'];
     delete responseHeaders['Cross-Origin-Opener-Policy'];
     callback({ cancel: false, responseHeaders });
-  });
+  };
 
-  // Also apply header stripping to all guest <webview> sessions
+  session.defaultSession.webRequest.onHeadersReceived(stripFrameHeaders);
+  browserSession.webRequest.onHeadersReceived(stripFrameHeaders);
+
+  // Configure all created guest webContents (webviews)
   app.on('web-contents-created', (_event, contents) => {
-    if (contents.getType() === 'webview') {
-      contents.session.webRequest.onHeadersReceived((details, callback) => {
-        const responseHeaders = { ...details.responseHeaders };
-        delete responseHeaders['x-frame-options'];
-        delete responseHeaders['X-Frame-Options'];
-        delete responseHeaders['content-security-policy'];
-        delete responseHeaders['Content-Security-Policy'];
-        delete responseHeaders['cross-origin-opener-policy'];
-        delete responseHeaders['Cross-Origin-Opener-Policy'];
-        callback({ cancel: false, responseHeaders });
-      });
-    }
+    contents.setUserAgent(CHROME_USER_AGENT);
+
+    // Allow popups and window.open navigation within guest sessions
+    contents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return { action: 'allow' };
+      }
+      return { action: 'deny' };
+    });
   });
 
   createWindow();

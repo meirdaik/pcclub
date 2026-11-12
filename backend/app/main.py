@@ -13,13 +13,18 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_engine
 from app.core.errors import register_error_handlers
 
-_DEV_CORS_ORIGIN_REGEX = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
+# Dev default: this machine and private LAN addresses (kiosk PCs and phones on the club network),
+# plain http only. Anything else needs CORS_ALLOW_ORIGIN_REGEX.
+_LAN_CORS_ORIGIN_REGEX = (
+    r"^http://(localhost|127\.0\.0\.1|0\.0\.0\.0|"
+    r"192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$"
+)
 
 
 def _cors_origin_regex(settings: Settings) -> str | None:
     if settings.cors_allow_origin_regex is not None:
         return settings.cors_allow_origin_regex or None
-    return _DEV_CORS_ORIGIN_REGEX if settings.environment == "dev" else None
+    return _LAN_CORS_ORIGIN_REGEX if settings.environment == "dev" else None
 
 
 @asynccontextmanager
