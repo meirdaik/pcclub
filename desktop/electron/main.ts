@@ -385,22 +385,6 @@ $fc = @(Get-Service -Name 'FACEIT','FACEITService' -ErrorAction SilentlyContinue
 function applyRegistryLockdown(locked: boolean): void {
   if (process.platform !== 'win32') return;
 
-  const flagDir = 'C:\\ProgramData\\PCClub';
-  const flagPath = path.join(flagDir, 'maintenance.flag');
-
-  try {
-    if (!fs.existsSync(flagDir)) {
-      fs.mkdirSync(flagDir, { recursive: true });
-    }
-    if (locked) {
-      if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath);
-    } else {
-      fs.writeFileSync(flagPath, `Maintenance mode active since ${new Date().toISOString()}`, 'utf-8');
-    }
-  } catch (err) {
-    console.warn('[SENET Registry] Flag file update warning:', err);
-  }
-
   const val = locked ? 1 : 0;
   const cmds = [
     `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v DisableTaskMgr /t REG_DWORD /d ${val} /f`,
@@ -418,26 +402,35 @@ function setMaintenanceMode(enabled: boolean): void {
   isMaintenanceMode = enabled;
   applyRegistryLockdown(!enabled);
 
-  if (enabled) {
-    shellManager.restoreExplorer();
-    hudManager.hide();
-    if (mainWindow) {
-      mainWindow.setKiosk(false);
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.setFullScreen(false);
-      mainWindow.minimize();
+  const flagDir = 'C:\\ProgramData\\PCClub';
+  const flagPath = path.join(flagDir, 'maintenance.flag');
+  try {
+    if (enabled) {
+      if (!fs.existsSync(flagDir)) fs.mkdirSync(flagDir, { recursive: true });
+      fs.writeFileSync(flagPath, `Technician maintenance active since ${new Date().toISOString()}`, 'utf-8');
+      shellManager.restoreExplorer();
+      hudManager.hide();
+      if (mainWindow) {
+        mainWindow.setKiosk(false);
+        mainWindow.setAlwaysOnTop(false);
+        mainWindow.setFullScreen(false);
+        mainWindow.minimize();
+      }
+      console.log('[SENET Maintenance] Maintenance Mode ACTIVATED (Windows Explorer restored for technician)');
+    } else {
+      if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath);
+      shellManager.killExplorer();
+      if (mainWindow) {
+        mainWindow.restore();
+        mainWindow.setKiosk(true);
+        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+        mainWindow.setFullScreen(true);
+        mainWindow.focus();
+      }
+      console.log('[SENET Maintenance] Kiosk Protection Mode RESTORED (Windows Explorer terminated)');
     }
-    console.log('[SENET Maintenance] Maintenance Mode ACTIVATED (Windows Explorer restored for technician)');
-  } else {
-    shellManager.killExplorer();
-    if (mainWindow) {
-      mainWindow.restore();
-      mainWindow.setKiosk(true);
-      mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-      mainWindow.setFullScreen(true);
-      mainWindow.focus();
-    }
-    console.log('[SENET Maintenance] Kiosk Protection Mode RESTORED (Windows Explorer terminated)');
+  } catch (err) {
+    console.warn('[SENET Maintenance] Error toggling maintenance mode:', err);
   }
 }
 
