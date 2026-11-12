@@ -39,7 +39,7 @@ async def create_owner(org_name: str, email: str, password: str) -> None:
 
 
 async def seed_demo() -> None:
-    """Demo clubs with zones, PCs and packages, for local development only."""
+    """One demo club with zones, PCs and packages, for local development only."""
     if get_settings().environment == "prod":
         sys.exit("seed-demo is not available in production")
     async with get_sessionmaker()() as session:
@@ -54,15 +54,7 @@ async def seed_demo() -> None:
             opens_at=None,
             closes_at=None,
         )
-        daytime = Club(
-            organization_id=org.id,
-            name="Demo Daytime",
-            city="Astana",
-            address="Mangilik El 1",
-            opens_at=time(10),
-            closes_at=time(23),
-        )
-        session.add_all([club, daytime])
+        session.add(club)
         await session.flush()
         # Demo Arena follows a real club price list: three zones, each with an hourly price,
         # "2+1" and "3+2" hour bundles, a day window and a night window (18+).
@@ -120,21 +112,8 @@ async def seed_demo() -> None:
                     ),
                 ]
             )
-        # The daytime club has only an hourly price.
-        daytime_zone = Zone(club_id=daytime.id, name="Standard", price_per_hour_kzt=700)
-        session.add(daytime_zone)
-        await session.flush()
-        session.add_all(
-            [
-                Pc(club_id=daytime.id, zone_id=daytime_zone.id, label=f"D-{n:02d}")
-                for n in range(1, 5)
-            ]
-        )
         await session.commit()
-    print(
-        "Seeded demo clubs with hourly prices and packages: "
-        "Demo Arena (Almaty, 24/7), Demo Daytime (Astana, 10:00-23:00)"
-    )
+    print("Seeded the demo club with hourly prices and packages: Demo Arena (Almaty, 24/7)")
 
 
 async def _run(args: argparse.Namespace) -> None:
@@ -156,7 +135,7 @@ def main() -> None:
     owner = sub.add_parser("create-owner", help="create an organization and its owner account")
     owner.add_argument("--org", required=True, help="organization (legal entity) name")
     owner.add_argument("--email", required=True)
-    sub.add_parser("seed-demo", help="insert demo clubs, zones and PCs (dev only)")
+    sub.add_parser("seed-demo", help="insert the demo club, zones and PCs (dev only)")
     asyncio.run(_run(parser.parse_args()))
 
 
