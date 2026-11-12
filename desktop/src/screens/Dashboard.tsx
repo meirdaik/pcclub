@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionInfo, GameItem, MenuItem, CartItem, SystemStats } from '../types';
 import { socketService } from '../services/socket';
+import { getAppConfig } from '../services/config';
 
 interface DashboardProps {
   session: SessionInfo;
   onSessionEnd: () => void;
 }
-
-const PC_LABEL = import.meta.env.VITE_PC_LABEL || 'PC #1';
-const PC_ID = import.meta.env.VITE_PC_ID || 'pc-001';
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://127.0.0.1:8000';
 
 type TabType = 'games' | 'browser' | 'bar' | 'admin' | 'system';
 
@@ -171,7 +168,159 @@ const SENET_MENU: MenuItem[] = [
   },
 ];
 
+// Helper to normalize entered URLs and auto-route Telegram
+function normalizeBrowserUrl(raw: string): string {
+  const url = raw.trim();
+  if (!url) return 'https://www.google.com';
+
+  if (/^https?:\/\//i.test(url)) {
+    if (/^https?:\/\/web\.telegram\.org\/?$/i.test(url)) {
+      return 'https://web.telegram.org/a/';
+    }
+    return url;
+  }
+
+  if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+/i.test(url) && !url.includes(' ')) {
+    if (/^web\.telegram\.org\/?$/i.test(url)) {
+      return 'https://web.telegram.org/a/';
+    }
+    return `https://${url}`;
+  }
+
+  return `https://www.google.com/search?q=${encodeURIComponent(url)}`;
+}
+
+const CHROME_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+function KioskWebview({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const webviewRef = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = '';
+
+    const webview = document.createElement('webview') as any;
+    webview.setAttribute('src', url);
+    webview.setAttribute('partition', 'persist:senet_browser');
+    webview.setAttribute('useragent', CHROME_USER_AGENT);
+    webview.setAttribute('allowpopups', 'true');
+    webview.style.width = '100%';
+    webview.style.height = '100%';
+    webview.style.flex = '1';
+    webview.style.border = 'none';
+    webview.style.display = 'flex';
+    webview.style.backgroundColor = '#0e1224';
+
+    webview.addEventListener('did-start-loading', () => {
+      setIsLoading(true);
+      setLoadError(null);
+    });
+    webview.addEventListener('did-stop-loading', () => {
+      setIsLoading(false);
+    });
+    webview.addEventListener('did-fail-load', (e: any) => {
+      setIsLoading(false);
+      if (e.errorCode !== -3 && e.errorCode !== 0) {
+        setLoadError(`Failed to load page (${e.errorDescription || 'Connection error'}). Try reloading or opening in Chrome.`);
+      }
+    });
+
+    containerRef.current.appendChild(webview);
+    webviewRef.current = webview;
+
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+      webviewRef.current = null;
+    };
+  }, [url]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {isLoading && (
+        <div style={styles.browserLoadingBar}>
+          <div style={styles.browserLoadingProgress} />
+        </div>
+      )}
+      {loadError && (
+        <div style={styles.browserErrorOverlay}>
+          <div style={{ color: '#ff4d88', fontWeight: 'bold', fontSize: '13px' }}>
+            ⚠️ {loadError}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => webviewRef.current?.reload()}
+              className="cyber-button secondary"
+              style={{ padding: '6px 12px', fontSize: '11px' }}
+            >
+              🔄 Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.electronAPI?.openExternal) {
+                  window.electronAPI.openExternal(url);
+                } else {
+                  window.open(url, '_blank');
+                }
+              }}
+              className="cyber-button"
+              style={{ padding: '6px 12px', fontSize: '11px' }}
+            >
+              🌐 Open in Chrome
+            </button>
+          </div>
+        </div>
+      )}
+      <div ref={containerRef} style={{ width: '100%', height: '100%', flex: 1, display: 'flex' }} />
+    </div>
+  );
+}
+
+function BrowserFallbackView({ url }: { url: string }) {
+  return (
+    <div style={styles.browserWebFallback}>
+      <div className="glass-panel" style={styles.browserNoticeCard}>
+        <div style={{ fontSize: '36px', marginBottom: '12px' }}>🌐</div>
+        <h3 style={{ color: '#00f0ff', margin: '0 0 10px 0', fontSize: '18px', fontFamily: '"Orbitron", sans-serif' }}>
+          WEB BROWSER PREVIEW MODE
+        </h3>
+        <p style={{ color: '#cbd5e1', fontSize: '13px', maxWidth: '540px', margin: '0 auto 16px auto', lineHeight: 1.6 }}>
+          You are currently previewing in a regular web browser (Chrome / Edge).
+          Platforms like <strong>Telegram</strong>, <strong>Discord</strong>, and <strong>YouTube</strong> enforce browser security policies (<code>X-Frame-Options: SAMEORIGIN</code>) preventing display inside standard web iframes.
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '20px' }}>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cyber-button"
+            style={{ textDecoration: 'none', padding: '12px 24px', fontSize: '13px' }}
+          >
+            Open in New Browser Tab ↗
+          </a>
+        </div>
+        <div style={{ borderTop: '1px solid #1e243b', paddingTop: '14px', color: '#94a3b8', fontSize: '12px' }}>
+          💡 <strong>To test the embedded in-app browser with full bypass:</strong><br />
+          Launch the desktop kiosk application: <code style={{ color: '#00ff88', background: '#070913', padding: '2px 6px', borderRadius: '4px' }}>npm run electron:dev</code> or run <code style={{ color: '#00ff88', background: '#070913', padding: '2px 6px', borderRadius: '4px' }}>release\win-unpacked\PC Club Kiosk.exe</code>.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
+  const config = getAppConfig();
+  const pcLabel = config.pcLabel;
+  const pcId = config.pcId;
+  const serverUrl = config.serverUrl;
+
   const [secondsLeft, setSecondsLeft] = useState<number>(session.remainingSeconds);
   const [activeTab, setActiveTab] = useState<TabType>('games');
   const [isMiniHud, setIsMiniHud] = useState(false);
@@ -325,17 +474,17 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
     try {
-      const res = await fetch(`${SERVER_URL}/api/pc/${PC_ID}/order`, {
+      const res = await fetch(`${serverUrl}/api/pc/${pcId}/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: cart.map((c) => ({ name: c.name, quantity: c.quantity, price_kzt: c.priceKzt })),
           total_kzt: cartTotal,
-          note: `Order from ${PC_LABEL} for ${session.username}`,
+          note: `Order from ${pcLabel} for ${session.username}`,
         }),
       });
       if (res.ok) {
-        setOrderFeedback(`Order placed! Total: ${cartTotal.toLocaleString()} ₸. Admin will deliver to ${PC_LABEL}.`);
+        setOrderFeedback(`Order placed! Total: ${cartTotal.toLocaleString()} ₸. Admin will deliver to ${pcLabel}.`);
         setCart([]);
       } else {
         setOrderFeedback('Order recorded locally. Operator notified!');
@@ -350,7 +499,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
 
   const handleSendAdminCall = async () => {
     try {
-      await fetch(`${SERVER_URL}/api/pc/${PC_ID}/call-admin`, {
+      await fetch(`${serverUrl}/api/pc/${pcId}/call-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -358,9 +507,9 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
           message: adminMessage || undefined,
         }),
       });
-      setAdminFeedback(`Administrator alerted for ${PC_LABEL}! Someone is on the way.`);
+      setAdminFeedback(`Administrator alerted for ${pcLabel}! Someone is on the way.`);
     } catch {
-      setAdminFeedback(`Administrator alerted for ${PC_LABEL}!`);
+      setAdminFeedback(`Administrator alerted for ${pcLabel}!`);
     }
     setAdminMessage('');
     setTimeout(() => setAdminFeedback(null), 5000);
@@ -369,7 +518,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   const handleEndSession = async () => {
     if (confirm('End your PC session and lock this terminal?')) {
       try {
-        await fetch(`${SERVER_URL}/api/pc/${PC_ID}/lock`, { method: 'POST' });
+        await fetch(`${serverUrl}/api/pc/${pcId}/lock`, { method: 'POST' });
       } catch (err) {
         console.error('Lock error:', err);
       }
@@ -386,7 +535,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
         <div className="glass-panel" style={styles.miniHudCard}>
           <div style={styles.miniHudLeft}>
             <span style={styles.miniHudDot}></span>
-            <span style={styles.miniHudStation}>{PC_LABEL}</span>
+            <span style={styles.miniHudStation}>{pcLabel}</span>
             <span style={styles.miniHudUser}>{session.username}</span>
           </div>
 
@@ -432,7 +581,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
             <span style={styles.senetLogoText}>SENET</span>
             <span style={styles.senetSubBadge}>OS</span>
           </div>
-          <div style={styles.stationPill}>{PC_LABEL}</div>
+          <div style={styles.stationPill}>{pcLabel}</div>
         </div>
 
         {/* Center Live Session Timer */}
@@ -603,6 +752,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
             <div className="glass-panel" style={styles.browserToolbar}>
               <div style={styles.browserQuickButtons}>
                 <button
+                  type="button"
                   onClick={() => {
                     setBrowserUrl('https://www.youtube.com');
                     setInputUrl('https://www.youtube.com');
@@ -613,6 +763,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   YouTube
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setBrowserUrl('https://www.twitch.tv');
                     setInputUrl('https://www.twitch.tv');
@@ -623,6 +774,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   Twitch
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setBrowserUrl('https://discord.com/app');
                     setInputUrl('https://discord.com/app');
@@ -633,17 +785,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   Discord
                 </button>
                 <button
-                  onClick={() => {
-                    const tgUrl = 'https://web.telegram.org/k/';
-                    setBrowserUrl(tgUrl);
-                    setInputUrl(tgUrl);
-                  }}
-                  className="cyber-button secondary"
-                  style={styles.browserQuickBtn}
-                >
-                  Telegram (Web K)
-                </button>
-                <button
+                  type="button"
                   onClick={() => {
                     const tgUrl = 'https://web.telegram.org/a/';
                     setBrowserUrl(tgUrl);
@@ -651,10 +793,25 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   }}
                   className="cyber-button secondary"
                   style={styles.browserQuickBtn}
+                  title="Telegram Web A (Modern responsive web app)"
                 >
                   Telegram (Web A)
                 </button>
                 <button
+                  type="button"
+                  onClick={() => {
+                    const tgUrl = 'https://web.telegram.org/k/';
+                    setBrowserUrl(tgUrl);
+                    setInputUrl(tgUrl);
+                  }}
+                  className="cyber-button secondary"
+                  style={styles.browserQuickBtn}
+                  title="Telegram Web K (Classic fast web app)"
+                >
+                  Telegram (Web K)
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setBrowserUrl('https://fast.com');
                     setInputUrl('https://fast.com');
@@ -670,11 +827,9 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  let url = inputUrl.trim();
-                  if (!/^https?:\/\//i.test(url)) {
-                    url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
-                  }
-                  setBrowserUrl(url);
+                  const target = normalizeBrowserUrl(inputUrl);
+                  setBrowserUrl(target);
+                  setInputUrl(target);
                 }}
                 style={styles.urlForm}
               >
@@ -684,7 +839,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   style={styles.urlInput}
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="Search the web or enter URL..."
+                  placeholder="Enter URL (e.g. web.telegram.org or youtube.com)..."
                 />
                 <button type="submit" className="cyber-button" style={styles.goBtn}>
                   GO
@@ -724,19 +879,9 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
             <div style={styles.iframeWrapper}>
               {browserUrl && (
                 window.electronAPI ? (
-                  // Electron native webview: ignores X-Frame-Options and CSP restrictions
-                  React.createElement('webview', {
-                    src: browserUrl,
-                    style: styles.inAppIframe,
-                    allowpopups: 'true',
-                  })
+                  <KioskWebview url={browserUrl} />
                 ) : (
-                  <iframe
-                    src={browserUrl}
-                    title="SENET In-Kiosk Web App"
-                    style={styles.inAppIframe}
-                    allow="autoplay; encrypted-media; fullscreen; clipboard-read; clipboard-write; microphone; camera"
-                  />
+                  <BrowserFallbackView url={browserUrl} />
                 )
               )}
             </div>
@@ -751,7 +896,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                 <h2 className="cyber-glitch-text" style={styles.paneTitle}>
                   CLUB SNACK BAR & FOOD
                 </h2>
-                <span style={styles.paneSub}>ITEMS ARE DELIVERED DIRECTLY TO {PC_LABEL}</span>
+                <span style={styles.paneSub}>ITEMS ARE DELIVERED DIRECTLY TO {pcLabel}</span>
               </div>
 
               <div style={styles.menuList}>
@@ -819,7 +964,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                   className="cyber-button"
                   style={styles.checkoutBtn}
                 >
-                  ORDER TO {PC_LABEL}
+                  ORDER TO {pcLabel}
                 </button>
               </div>
             </div>
@@ -891,7 +1036,7 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
               <div style={styles.specGrid}>
                 <div style={styles.specItem}>
                   <span style={styles.specKey}>STATION IDENTIFIER</span>
-                  <span style={styles.specVal}>{PC_LABEL} ({PC_ID})</span>
+                  <span style={styles.specVal}>{pcLabel} ({pcId})</span>
                 </div>
                 <div style={styles.specItem}>
                   <span style={styles.specKey}>PROCESSOR (CPU)</span>
@@ -1192,6 +1337,51 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     border: 'none',
     display: 'flex',
+  },
+  browserWebFallback: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '30px',
+    backgroundColor: '#070913',
+  },
+  browserNoticeCard: {
+    maxWidth: '620px',
+    textAlign: 'center',
+    padding: '36px 30px',
+    border: '1px solid rgba(0, 240, 255, 0.3)',
+    borderRadius: '16px',
+    backgroundColor: '#0c1020',
+  },
+  browserLoadingBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '3px',
+    backgroundColor: 'rgba(0, 240, 255, 0.2)',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  browserLoadingProgress: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#00f0ff',
+  },
+  browserErrorOverlay: {
+    position: 'absolute',
+    top: '12px',
+    right: '12px',
+    backgroundColor: 'rgba(26, 8, 20, 0.95)',
+    border: '1px solid #ff0055',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    zIndex: 20,
+    boxShadow: '0 4px 15px rgba(255, 0, 85, 0.3)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
   },
   barPane: {
     width: '100%',

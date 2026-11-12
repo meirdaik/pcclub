@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { socketService } from './services/socket';
+import { initAppConfig } from './services/config';
 import { AppState, SessionInfo, ServerMessage } from './types';
 import LockScreen from './screens/LockScreen';
 import Dashboard from './screens/Dashboard';
@@ -51,45 +52,50 @@ function App() {
     // Initial kiosk protection
     window.electronAPI?.setKioskLocked(true);
 
-    // Connect WebSocket
-    socketService.connect();
+    let unsubscribe = () => {};
 
-    const unsubscribe = socketService.onMessage((message: ServerMessage) => {
-      switch (message.action) {
-        case 'UNLOCK':
-          if (message.username && message.remaining_seconds !== undefined) {
-            handleUnlock({
-              username: message.username,
-              remainingSeconds: message.remaining_seconds,
-              isAdmin: Boolean(message.is_admin),
-              balanceKzt: message.balance,
-            });
-          }
-          break;
+    // Initialize config from config.json (or environment / URL parameters)
+    initAppConfig().then(() => {
+      // Connect WebSocket to configured server
+      socketService.connect();
 
-        case 'LOCK':
-          handleLock();
-          break;
+      unsubscribe = socketService.onMessage((message: ServerMessage) => {
+        switch (message.action) {
+          case 'UNLOCK':
+            if (message.username && message.remaining_seconds !== undefined) {
+              handleUnlock({
+                username: message.username,
+                remainingSeconds: message.remaining_seconds,
+                isAdmin: Boolean(message.is_admin),
+                balanceKzt: message.balance,
+              });
+            }
+            break;
 
-        case 'EXTEND':
-          if (message.remaining_seconds !== undefined) {
-            setSession((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    remainingSeconds: message.remaining_seconds!,
-                  }
-                : null,
-            );
-            socketService.updateSessionTelemetry(
-              'ACTIVE',
-              message.remaining_seconds,
-              undefined,
-              undefined,
-            );
-          }
-          break;
-      }
+          case 'LOCK':
+            handleLock();
+            break;
+
+          case 'EXTEND':
+            if (message.remaining_seconds !== undefined) {
+              setSession((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      remainingSeconds: message.remaining_seconds!,
+                    }
+                  : null,
+              );
+              socketService.updateSessionTelemetry(
+                'ACTIVE',
+                message.remaining_seconds,
+                undefined,
+                undefined,
+              );
+            }
+            break;
+        }
+      });
     });
 
     return () => {

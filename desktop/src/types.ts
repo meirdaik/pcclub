@@ -96,7 +96,19 @@ export interface AdminTariffItem {
   price_kzt: number;
 }
 
+export interface AppConfig {
+  serverIp: string;
+  serverPort: number;
+  serverUrl: string;
+  wsUrl: string;
+  pcId: string;
+  pcNumber: number;
+  pcLabel: string;
+  authToken: string;
+}
+
 export interface ElectronAPI {
+  getConfig: () => Promise<AppConfig>;
   launchApp: (exePathOrUri: string) => Promise<{ success: boolean; error?: string }>;
   getPcInfo: () => Promise<{ pcId: string; pcLabel: string }>;
   getSystemStats: () => Promise<SystemStats>;
@@ -112,5 +124,6 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI?: ElectronAPI;
+    __APP_CONFIG__?: AppConfig;
   }
 }

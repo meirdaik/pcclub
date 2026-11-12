@@ -1,10 +1,7 @@
 import { ServerMessage, ClientMessage } from '../types';
+import { getAppConfig } from './config';
 
 type MessageHandler = (message: ServerMessage) => void;
-
-const PC_ID = import.meta.env.VITE_PC_ID || 'pc-001';
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000';
-const AUTH_TOKEN = import.meta.env.VITE_PC_AUTH_TOKEN || 'dev-pc-token';
 
 const HEARTBEAT_INTERVAL = 5_000; // 5 seconds telemetry heartbeat
 const BASE_RECONNECT_DELAY = 1_000;
@@ -48,7 +45,8 @@ class SocketService {
   private doConnect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    const url = `${WS_URL}/ws/pc/${PC_ID}`;
+    const config = getAppConfig();
+    const url = `${config.wsUrl}/ws/pc/${config.pcId}`;
     console.log(`[SENET Socket] Connecting to ${url}...`);
 
     try {
@@ -60,11 +58,11 @@ class SocketService {
     }
 
     this.ws.onopen = () => {
-      console.log('[SENET Socket] Connected to club server');
+      console.log(`[SENET Socket] Connected to club server for ${config.pcId}`);
       this.reconnectAttempt = 0;
 
       // Send authentication handshake
-      const authMsg: ClientMessage = { type: 'auth', token: AUTH_TOKEN };
+      const authMsg: ClientMessage = { type: 'auth', token: config.authToken };
       this.ws?.send(JSON.stringify(authMsg));
 
       // Start 5-second heartbeat telemetry
@@ -105,9 +103,10 @@ class SocketService {
 
   private sendHeartbeat(): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      const config = getAppConfig();
       const hb: ClientMessage = {
         type: 'heartbeat',
-        pc_id: PC_ID,
+        pc_id: config.pcId,
         status: this.currentStatus,
         remaining_seconds: this.remainingSeconds,
         active_game: this.activeGame || undefined,
@@ -120,10 +119,11 @@ class SocketService {
 
   sendCallAdmin(message: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      const config = getAppConfig();
       this.ws.send(
         JSON.stringify({
           type: 'call_admin',
-          pc_id: PC_ID,
+          pc_id: config.pcId,
           message,
           timestamp: Date.now(),
         }),
@@ -133,10 +133,11 @@ class SocketService {
 
   sendOrderSnack(description: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      const config = getAppConfig();
       this.ws.send(
         JSON.stringify({
           type: 'order_snack',
-          pc_id: PC_ID,
+          pc_id: config.pcId,
           description,
           timestamp: Date.now(),
         }),
@@ -146,10 +147,11 @@ class SocketService {
 
   sendClearAlert(): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      const config = getAppConfig();
       this.ws.send(
         JSON.stringify({
           type: 'clear_alert',
-          pc_id: PC_ID,
+          pc_id: config.pcId,
           timestamp: Date.now(),
         }),
       );
