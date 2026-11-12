@@ -558,13 +558,25 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                 </button>
                 <button
                   onClick={() => {
-                    setBrowserUrl('https://web.telegram.org');
-                    setInputUrl('https://web.telegram.org');
+                    const tgUrl = 'https://web.telegram.org/k/';
+                    setBrowserUrl(tgUrl);
+                    setInputUrl(tgUrl);
                   }}
                   className="cyber-button secondary"
                   style={styles.browserQuickBtn}
                 >
-                  Telegram
+                  Telegram (Web K)
+                </button>
+                <button
+                  onClick={() => {
+                    const tgUrl = 'https://web.telegram.org/a/';
+                    setBrowserUrl(tgUrl);
+                    setInputUrl(tgUrl);
+                  }}
+                  className="cyber-button secondary"
+                  style={styles.browserQuickBtn}
+                >
+                  Telegram (Web A)
                 </button>
                 <button
                   onClick={() => {
@@ -601,17 +613,56 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                 <button type="submit" className="cyber-button" style={styles.goBtn}>
                   GO
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = browserUrl;
+                    setBrowserUrl('');
+                    setTimeout(() => setBrowserUrl(current), 50);
+                  }}
+                  className="cyber-button secondary"
+                  style={styles.goBtn}
+                  title="Reload web page"
+                >
+                  🔄
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.electronAPI?.openExternal) {
+                      window.electronAPI.openExternal(browserUrl);
+                    } else {
+                      window.open(browserUrl, '_blank');
+                    }
+                  }}
+                  className="cyber-button secondary"
+                  style={styles.browserQuickBtn}
+                  title="Open URL in native Chrome/Edge"
+                >
+                  OPEN IN CHROME
+                </button>
               </form>
             </div>
 
             {/* Embedded Web View Frame */}
             <div style={styles.iframeWrapper}>
-              <iframe
-                src={browserUrl}
-                title="SENET In-Kiosk Web App"
-                style={styles.inAppIframe}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              />
+              {browserUrl && (
+                window.electronAPI ? (
+                  // Electron native webview: ignores X-Frame-Options and CSP restrictions
+                  React.createElement('webview', {
+                    src: browserUrl,
+                    style: styles.inAppIframe,
+                    allowpopups: 'true',
+                  })
+                ) : (
+                  <iframe
+                    src={browserUrl}
+                    title="SENET In-Kiosk Web App"
+                    style={styles.inAppIframe}
+                    allow="autoplay; encrypted-media; fullscreen; clipboard-read; clipboard-write; microphone; camera"
+                  />
+                )
+              )}
             </div>
           </div>
         )}

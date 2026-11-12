@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, shell, session } from 'electron';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
@@ -182,6 +182,16 @@ ipcMain.on('exit-kiosk', () => {
 // ----------------------------------------------------------------------
 
 app.whenReady().then(() => {
+  // Allow all embedded web apps by stripping X-Frame-Options & CSP headers
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    delete responseHeaders['x-frame-options'];
+    delete responseHeaders['X-Frame-Options'];
+    delete responseHeaders['content-security-policy'];
+    delete responseHeaders['Content-Security-Policy'];
+    callback({ cancel: false, responseHeaders });
+  });
+
   createWindow();
 
   // Register safe developer exit shortcut: Ctrl+Shift+Q
