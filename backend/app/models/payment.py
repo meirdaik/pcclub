@@ -3,8 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, tz_datetime, uuid_fk_type, uuid_pk
@@ -42,6 +41,6 @@ class Payment(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=PaymentStatus.PENDING)
     idempotency_key: Mapped[str] = mapped_column(String(100), nullable=False)
     redirect_url: Mapped[str | None] = mapped_column(String(1000))
-    raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    raw: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime | None] = mapped_column(tz_datetime)

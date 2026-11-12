@@ -38,6 +38,7 @@ from app.models import (
 )
 from app.models.booking import PC_OVERLAP_CONSTRAINT, USER_OVERLAP_CONSTRAINT
 from app.schemas.booking import BookingCreate
+from app.services.pc_session import pc_session_manager
 
 
 def _violated_constraint(exc: IntegrityError) -> str:
@@ -277,4 +278,6 @@ async def cancel_booking(
     booking.status = BookingStatus.CANCELLED
     booking.cancelled_at = now
     await session.commit()
+    # Lock the PC if currently connected
+    await pc_session_manager.send_command(str(booking.pc_id), "LOCK")
     return booking

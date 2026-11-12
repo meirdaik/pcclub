@@ -1,0 +1,11 @@
+{
+  "name": "pcclub-root",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm --prefix mobile install",
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "build": "npm --prefix mobile run build",
+    "lint": "npm --prefix mobile run typecheck"
+  }
+}

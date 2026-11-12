@@ -15,14 +15,17 @@ class Settings(BaseSettings):
 
     environment: Literal["dev", "test", "prod"] = "dev"
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/pcclub"
-    test_database_url: str | None = None
+    database_url: str = "sqlite+aiosqlite:///./pcclub.db"
+    test_database_url: str | None = "sqlite+aiosqlite:///./pcclub_test.db"
 
     # --- secrets (dev defaults are rejected when environment == "prod") ---
     jwt_secret: str = _DEV_SECRET
     iin_hash_pepper: str = _DEV_SECRET
     iin_encryption_key: str = ""  # Fernet key; empty = derived dev key
     mock_payment_webhook_secret: str = _DEV_SECRET
+
+    # --- PC kiosk WebSocket ---
+    pc_auth_token: str = "dev-pc-token"
 
     # --- auth ---
     access_token_ttl_minutes: int = 30

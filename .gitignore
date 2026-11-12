@@ -15,6 +15,9 @@ dist/
 
 # Local databases
 .pgdata/
+*.db
+*.sqlite
+*.sqlite3
 
 # Node (mobile/, admin/ in later phases)
 node_modules/
