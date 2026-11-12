@@ -129,6 +129,7 @@ export interface BiosSecurityInfo {
 
 export interface ElectronAPI {
   getConfig: () => Promise<AppConfig>;
+  saveConfig?: (cfg: Partial<AppConfig>) => Promise<{ success: boolean; config: AppConfig }>;
   launchApp: (exePathOrUri: string) => Promise<{ success: boolean; error?: string }>;
   getPcInfo: () => Promise<{ pcId: string; pcLabel: string }>;
   getSystemStats: () => Promise<SystemStats>;

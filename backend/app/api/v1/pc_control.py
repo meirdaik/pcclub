@@ -181,6 +181,25 @@ async def unlock_pc(
     if not sent and pc is not None:
         sent = await manager.send_command(str(pc.id), "UNLOCK", payload)
 
+    # Immediately reflect BUSY state in memory registry for zero-delay admin UI updates
+    manager.update_telemetry(
+        pc_id,
+        {
+            "status": "BUSY",
+            "current_user": body.username,
+            "remaining_seconds": body.remaining_seconds,
+        },
+    )
+    if pc is not None:
+        manager.update_telemetry(
+            str(pc.id),
+            {
+                "status": "BUSY",
+                "current_user": body.username,
+                "remaining_seconds": body.remaining_seconds,
+            },
+        )
+
     logger.info(
         "PC %s: UNLOCK requested for %s (remaining: %ds, sent: %s)",
         pc_id,
@@ -218,6 +237,27 @@ async def lock_pc(
     sent = await manager.send_command(pc_id, "LOCK")
     if not sent and pc is not None:
         sent = await manager.send_command(str(pc.id), "LOCK")
+
+    # Immediately reflect FREE state in memory registry for zero-delay admin UI updates
+    manager.update_telemetry(
+        pc_id,
+        {
+            "status": "FREE",
+            "current_user": None,
+            "remaining_seconds": 0,
+            "active_game": None,
+        },
+    )
+    if pc is not None:
+        manager.update_telemetry(
+            str(pc.id),
+            {
+                "status": "FREE",
+                "current_user": None,
+                "remaining_seconds": 0,
+                "active_game": None,
+            },
+        )
 
     logger.info("PC %s: LOCK command sent", pc_id)
     return CommandResult(ok=True, detail=f"LOCK sent to {pc_id}")

@@ -56,3 +56,40 @@ export async function initAppConfig(): Promise<AppConfig> {
 export function getAppConfig(): AppConfig {
   return cachedConfig;
 }
+
+export async function updateAndSaveAppConfig(newPartial: Partial<AppConfig>): Promise<AppConfig> {
+  const sIp = (newPartial.serverIp || cachedConfig.serverIp).trim();
+  const sPort = Number(newPartial.serverPort) || cachedConfig.serverPort || 8000;
+  const pcNum =
+    newPartial.pcNumber ||
+    (newPartial.pcId ? Number(String(newPartial.pcId).replace(/\D/g, '') || 1) : cachedConfig.pcNumber);
+  const pcId = newPartial.pcId || `pc-${String(pcNum).padStart(3, '0')}`;
+  const pcLabel = newPartial.pcLabel || `PC #${pcNum}`;
+
+  cachedConfig = {
+    ...cachedConfig,
+    ...newPartial,
+    serverIp: sIp,
+    serverPort: sPort,
+    serverUrl: `http://${sIp}:${sPort}`,
+    wsUrl: `ws://${sIp}:${sPort}`,
+    pcId,
+    pcNumber: pcNum,
+    pcLabel,
+  };
+
+  if (window.electronAPI?.saveConfig) {
+    try {
+      await window.electronAPI.saveConfig(cachedConfig);
+      console.log('[Config] Config saved persistently via Electron IPC:', cachedConfig);
+    } catch (err) {
+      console.warn('[Config] Failed to save config to Electron:', err);
+    }
+  }
+
+  try {
+    localStorage.setItem('pcclub_kiosk_config', JSON.stringify(cachedConfig));
+  } catch {}
+
+  return cachedConfig;
+}

@@ -1,5 +1,7 @@
 """FastAPI application factory."""
 
+import socket
+from typing import Any
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -12,6 +14,20 @@ from app.api.v1.admin import clubs as admin_clubs
 from app.core.config import Settings, get_settings
 from app.core.db import get_engine
 from app.core.errors import register_error_handlers
+
+
+def get_local_lan_ip() -> str:
+    """Detect local LAN IPv4 address reachable by other club PCs."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return "127.0.0.1"
+
 
 # Dev default: this machine and private LAN addresses (kiosk PCs and phones on the club network),
 # plain http only. Anything else needs CORS_ALLOW_ORIGIN_REGEX.
@@ -34,6 +50,15 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Automatic initial database seed (12 PCs across Standard/VIP, Tariffs, Admin, Player1)
+    try:
+        from scripts.seed import seed
+        await seed()
+    except Exception as exc:
+        import logging
+        logging.getLogger("uvicorn.error").warning("Auto-seed on startup: %s", exc)
+
     yield
     if get_engine.cache_info().currsize:
         await get_engine().dispose()
@@ -76,6 +101,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/system/info", tags=["system"])
+    @app.get("/v1/system/info", tags=["system"])
+    async def system_info() -> dict[str, Any]:
+        lan_ip = get_local_lan_ip()
+        return {
+            "status": "online",
+            "club_name": "CYBER ARENA CLUB",
+            "server_ip": lan_ip,
+            "server_port": 8000,
+            "server_url": f"http://{lan_ip}:8000",
+            "ws_url": f"ws://{lan_ip}:8000",
+            "local_url": "http://127.0.0.1:8000",
+            "version": "1.0.0",
+        }
 
     return app
 
