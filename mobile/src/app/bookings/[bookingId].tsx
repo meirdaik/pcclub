@@ -5,17 +5,19 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import {
   type Booking,
+  type Package,
   type Payment,
   type PaymentMethod,
   cancelBooking,
   createPayment,
   getBooking,
   getClub,
+  listPackages,
   listPcs,
   simulateMockPayment,
 } from '@/api/endpoints';
 import { errorMessage, formatCountdown, formatInstantDay, formatKzt, t } from '@/i18n';
-import { formatTime } from '@/lib/time';
+import { formatTime, parseInstant } from '@/lib/time';
 import { useLoad } from '@/lib/useLoad';
 import { useNow } from '@/lib/useNow';
 import { Button, Card, Chip, Loadable, Notice, Row, Screen } from '@/ui/components';
@@ -132,17 +134,26 @@ export default function BookingScreen() {
 
   const state = useLoad(async () => {
     const booking = await getBooking(bookingId);
-    const [club, pcs] = await Promise.all([
+    const [club, pcs, packages] = await Promise.all([
       getClub(booking.club_id),
       listPcs(booking.club_id).catch(() => []),
+      // Only to show the package's name; a package no longer on sale is simply not listed.
+      booking.package_id
+        ? listPackages(booking.club_id).catch((): Package[] => [])
+        : Promise.resolve<Package[]>([]),
     ]);
-    return { booking, club, pc: pcs.find((pc) => pc.id === booking.pc_id) ?? null };
+    return {
+      booking,
+      club,
+      pc: pcs.find((pc) => pc.id === booking.pc_id) ?? null,
+      packageName: packages.find((item) => item.id === booking.package_id)?.name ?? null,
+    };
   }, `booking:${bookingId}`);
 
   const booking = state.data?.booking ?? null;
   const holdDeadline =
     booking?.status === 'pending_payment' && booking.hold_expires_at
-      ? Date.parse(booking.hold_expires_at)
+      ? parseInstant(booking.hold_expires_at)
       : null;
   const now = useNow(1000);
   const holdLeft = holdDeadline === null ? null : Math.max(0, holdDeadline - now);
@@ -171,10 +182,10 @@ export default function BookingScreen() {
   return (
     <Screen>
       <Loadable state={state}>
-        {({ booking: current, club, pc }) => {
+        {({ booking: current, club, pc, packageName }) => {
           const zone = club.timezone;
-          const start = Date.parse(current.starts_at);
-          const end = Date.parse(current.ends_at);
+          const start = parseInstant(current.starts_at);
+          const end = parseInstant(current.ends_at);
           const pending = current.status === 'pending_payment';
           const cancellable =
             (pending || current.status === 'confirmed') && start > now;
@@ -194,6 +205,9 @@ export default function BookingScreen() {
                   label={t.bookings.time}
                   value={`${formatInstantDay(start, zone)}, ${formatTime(start, zone)}–${formatTime(end, zone)}`}
                 />
+                {current.package_id ? (
+                  <Row label={t.bookings.tariff} value={packageName ?? t.bookings.package} />
+                ) : null}
                 <Row label={t.bookings.price} value={formatKzt(current.price_kzt)} />
               </Card>
 

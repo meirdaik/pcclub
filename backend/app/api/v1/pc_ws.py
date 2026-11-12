@@ -23,7 +23,7 @@ async def _resolve_pc(session: AsyncSession, pc_identifier: str) -> Pc | None:
         pc = await session.get(Pc, pc_uuid)
         if pc is not None:
             return pc
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         pass
 
     # Search by label
@@ -53,7 +53,7 @@ async def pc_websocket(
     # ------------------------------------------------------------------
     try:
         auth_msg = await ws.receive_json()
-    except (WebSocketDisconnect, Exception):
+    except WebSocketDisconnect, Exception:
         return
 
     if (
@@ -71,7 +71,7 @@ async def pc_websocket(
     pc = None
     try:
         pc = await _resolve_pc(session, pc_key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("PC %s: DB lookup bypassed in dev mode: %s", pc_key, exc)
 
     if pc is not None and pc.status == PcStatus.RETIRED:

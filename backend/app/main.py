@@ -13,8 +13,10 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_engine
 from app.core.errors import register_error_handlers
 
+# Dev default: this machine and private LAN addresses (kiosk PCs and phones on the club network),
+# plain http only. Anything else needs CORS_ALLOW_ORIGIN_REGEX.
 _LAN_CORS_ORIGIN_REGEX = (
-    r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|"
+    r"^http://(localhost|127\.0\.0\.1|0\.0\.0\.0|"
     r"192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$"
 )
 
@@ -27,8 +29,8 @@ def _cors_origin_regex(settings: Settings) -> str | None:
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
-    from app.core.db import Base
     import app.models  # noqa: F401
+    from app.core.db import Base
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

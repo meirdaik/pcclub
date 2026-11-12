@@ -3,7 +3,7 @@
 from app.models.auth import OtpCode, RefreshToken
 from app.models.base import Base
 from app.models.booking import ACTIVE_BOOKING_STATUSES, Booking, BookingStatus
-from app.models.club import Club, Pc, PcStatus, Zone
+from app.models.club import Club, Package, Pc, PcStatus, Zone
 from app.models.kiosk import GamingSession, SessionStatus, SnackOrder, Tariff, Transaction
 from app.models.organization import Organization, StaffRole, StaffUser
 from app.models.payment import Payment, PaymentStatus
@@ -19,6 +19,7 @@ __all__ = [
     "IdentityStatus",
     "Organization",
     "OtpCode",
+    "Package",
     "Payment",
     "PaymentStatus",
     "Pc",

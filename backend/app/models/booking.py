@@ -33,7 +33,8 @@ _table_args_list = [
     CheckConstraint("ends_at > starts_at", name="ends_after_start"),
     CheckConstraint("price_kzt >= 0", name="price_non_negative"),
     CheckConstraint(
-        "status IN ('pending_payment', 'confirmed', 'completed', 'cancelled', 'expired', 'no_show')",
+        "status IN ('pending_payment', 'confirmed', 'completed', 'cancelled', 'expired',"
+        " 'no_show')",
         name="status_valid",
     ),
     CheckConstraint(
@@ -42,22 +43,24 @@ _table_args_list = [
 ]
 
 if "sqlite" not in get_settings().database_url:
-    _table_args_list.extend([
-        ExcludeConstraint(
-            ("pc_id", "="),
-            (literal_column(_PERIOD), "&&"),
-            where=text(_ACTIVE_WHERE),
-            using="gist",
-            name=PC_OVERLAP_CONSTRAINT,
-        ),
-        ExcludeConstraint(
-            ("user_id", "="),
-            (literal_column(_PERIOD), "&&"),
-            where=text(_ACTIVE_WHERE),
-            using="gist",
-            name=USER_OVERLAP_CONSTRAINT,
-        ),
-    ])
+    _table_args_list.extend(
+        [
+            ExcludeConstraint(
+                ("pc_id", "="),
+                (literal_column(_PERIOD), "&&"),
+                where=text(_ACTIVE_WHERE),
+                using="gist",
+                name=PC_OVERLAP_CONSTRAINT,
+            ),
+            ExcludeConstraint(
+                ("user_id", "="),
+                (literal_column(_PERIOD), "&&"),
+                where=text(_ACTIVE_WHERE),
+                using="gist",
+                name=USER_OVERLAP_CONSTRAINT,
+            ),
+        ]
+    )
 
 _table_args_list.append(Index("ix_bookings_club_id_starts_at", "club_id", "starts_at"))
 
@@ -81,6 +84,10 @@ class Booking(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     hold_expires_at: Mapped[datetime | None] = mapped_column(tz_datetime)
     price_kzt: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Set when the end time and price came from a package instead of the hourly rate.
+    package_id: Mapped[uuid.UUID | None] = mapped_column(
+        uuid_fk_type, ForeignKey("packages.id", ondelete="RESTRICT")
+    )
     created_at: Mapped[datetime] = created_at_column()
     cancelled_at: Mapped[datetime | None] = mapped_column(tz_datetime)
 

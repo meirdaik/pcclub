@@ -2,22 +2,19 @@
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Annotated, Any
+from datetime import UTC, datetime
+from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import SessionDep, SettingsDep
 from app.api.v1.pc_ws import _resolve_pc
-from app.core.config import Settings
-from app.core.errors import AppError
 from app.core.security import verify_password
-from app.models.club import Pc, Zone
-from app.models.kiosk import GamingSession, SessionStatus, SnackOrder, Tariff, Transaction
+from app.models.club import Pc
+from app.models.kiosk import GamingSession, SessionStatus, SnackOrder, Tariff
 from app.models.user import User
 from app.services.pc_session import PcSessionManager, get_pc_session_manager
 
@@ -89,7 +86,7 @@ async def unlock_pc(
 
     is_admin_user = False
     if user is not None:
-        if body.password and user.password_hash:
+        if body.password and user.password_hash:  # noqa: SIM102
             if not verify_password(user.password_hash, body.password):
                 raise HTTPException(status_code=401, detail="Invalid username or password")
         is_admin_user = user.role == "admin"
@@ -101,12 +98,12 @@ async def unlock_pc(
         gaming_session = GamingSession(
             user_id=user.id,
             pc_id=pc.id,
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             remaining_seconds=body.remaining_seconds,
             status=SessionStatus.ACTIVE,
         )
         session.add(gaming_session)
-        pc.status = "BUSY"
+        pc.session_status = "BUSY"
         pc.current_user_id = user.id
         pc.remaining_seconds = body.remaining_seconds
         await session.commit()
@@ -123,11 +120,21 @@ async def unlock_pc(
     if not sent and pc is not None:
         sent = await manager.send_command(str(pc.id), "UNLOCK", payload)
 
-    logger.info("PC %s: UNLOCK requested for %s (remaining: %ds, sent: %s)", pc_id, body.username, body.remaining_seconds, sent)
+    logger.info(
+        "PC %s: UNLOCK requested for %s (remaining: %ds, sent: %s)",
+        pc_id,
+        body.username,
+        body.remaining_seconds,
+        sent,
+    )
     return CommandResult(
         ok=True,
         detail=f"UNLOCK command sent to {pc_id}",
-        data={"username": body.username, "remaining_seconds": body.remaining_seconds, "is_admin": is_admin_user},
+        data={
+            "username": body.username,
+            "remaining_seconds": body.remaining_seconds,
+            "is_admin": is_admin_user,
+        },
     )
 
 
@@ -141,7 +148,7 @@ async def lock_pc(
     """Send LOCK to a connected PC kiosk client."""
     pc = await _resolve_pc(session, pc_id)
     if pc:
-        pc.status = "FREE"
+        pc.session_status = "FREE"
         pc.current_user_id = None
         pc.remaining_seconds = 0
         pc.current_game = None
@@ -178,7 +185,11 @@ async def extend_session(
         sent = await manager.send_command(str(pc.id), "EXTEND", payload)
 
     logger.info("PC %s: Extended +%ds (New total: %ds)", pc_id, body.additional_seconds, new_rem)
-    return CommandResult(ok=True, detail=f"Session extended +{body.additional_seconds}s", data={"remaining_seconds": new_rem})
+    return CommandResult(
+        ok=True,
+        detail=f"Session extended +{body.additional_seconds}s",
+        data={"remaining_seconds": new_rem},
+    )
 
 
 @router.post("/{pc_id}/call-admin")
@@ -268,7 +279,9 @@ async def list_admin_pcs(
     manager: PcSessionManager = Depends(get_pc_session_manager),
 ) -> list[dict[str, Any]]:
     """Return all club PCs with real-time merged status (Free, Busy, Offline, Alert)."""
-    db_pcs = (await session.scalars(select(Pc).options(selectinload(Pc.zone)).order_by(Pc.label))).all()
+    db_pcs = (
+        await session.scalars(select(Pc).options(selectinload(Pc.zone)).order_by(Pc.label))
+    ).all()
     live_states = manager.get_all_states()
 
     result = []
@@ -276,9 +289,9 @@ async def list_admin_pcs(
     if db_pcs:
         for p in db_pcs:
             # Check telemetry by canonical id, name, or label
-            pc_key = p.name or p.label.lower().replace(" ", "").replace("#", "-")
+            pc_key = p.name or p.label.lower().replace(" ", "").replace("#", "-")  # noqa: F841
             canonical_key = f"pc-{int(''.join(filter(str.isdigit, p.label)) or 1):03d}"
-            
+
             telemetry = (
                 live_states.get(canonical_key)
                 or live_states.get(p.label)
@@ -286,7 +299,11 @@ async def list_admin_pcs(
                 or {}
             )
 
-            is_online = manager.is_online(canonical_key) or manager.is_online(p.label) or manager.is_online(str(p.id))
+            is_online = (
+                manager.is_online(canonical_key)
+                or manager.is_online(p.label)
+                or manager.is_online(str(p.id))
+            )
             alert = telemetry.get("alert")
             rem_sec = telemetry.get("remaining_seconds", p.remaining_seconds)
             current_user = telemetry.get("current_user")
@@ -302,27 +319,33 @@ async def list_admin_pcs(
             else:
                 computed_status = "OFFLINE"
 
-            zone_name = "VIP" if (p.zone and "vip" in p.zone.name.lower()) or "vip" in str(p.label).lower() else "Standard"
+            zone_name = (
+                "VIP"
+                if (p.zone and "vip" in p.zone.name.lower()) or "vip" in str(p.label).lower()
+                else "Standard"
+            )
 
-            result.append({
-                "id": str(p.id),
-                "pc_id": canonical_key,
-                "label": p.label,
-                "name": p.name or canonical_key,
-                "zone": zone_name,
-                "status": computed_status,
-                "online": is_online,
-                "current_user": current_user,
-                "remaining_seconds": rem_sec,
-                "current_game": active_game,
-                "alert": alert,
-                "specs": p.specs,
-                "cpu_usage": telemetry.get("cpu_usage", 18 if computed_status == "BUSY" else 4),
-                "memory_usage": telemetry.get("memory_usage", 42 if computed_status == "BUSY" else 15),
-                "gpu_usage": telemetry.get("gpu_usage", 65 if computed_status == "BUSY" else 0),
-                "processes": telemetry.get("processes", [active_game] if active_game else []),
-                "last_heartbeat": telemetry.get("last_heartbeat"),
-            })
+            result.append(
+                {
+                    "id": str(p.id),
+                    "pc_id": canonical_key,
+                    "label": p.label,
+                    "name": p.name or canonical_key,
+                    "zone": zone_name,
+                    "status": computed_status,
+                    "online": is_online,
+                    "current_user": current_user,
+                    "remaining_seconds": rem_sec,
+                    "current_game": active_game,
+                    "alert": alert,
+                    "specs": p.specs,
+                    "cpu_usage": telemetry.get("cpu_usage", 18 if computed_status == "BUSY" else 4),
+                    "memory_usage": telemetry.get("memory_usage", 42 if computed_status == "BUSY" else 15),
+                    "gpu_usage": telemetry.get("gpu_usage", 65 if computed_status == "BUSY" else 0),
+                    "processes": telemetry.get("processes", [active_game] if active_game else []),
+                    "last_heartbeat": telemetry.get("last_heartbeat"),
+                }
+            )
     else:
         # Fallback if DB empty: generate standard 10 PCs
         for i in range(1, 11):
@@ -331,34 +354,27 @@ async def list_admin_pcs(
             telemetry = live_states.get(key, {})
             is_online = manager.is_online(key)
             status = telemetry.get("status", "FREE" if is_online else "OFFLINE")
-            result.append({
-                "id": str(uuid.uuid4()),
-                "pc_id": key,
-                "label": label,
-                "name": f"PC-{i:02d}",
-                "zone": "VIP" if i > 5 else "Standard",
-                "status": status,
-                "online": is_online,
-                "current_user": telemetry.get("current_user"),
-                "remaining_seconds": telemetry.get("remaining_seconds", 0),
-                "current_game": telemetry.get("active_game"),
-                "alert": telemetry.get("alert"),
-                "specs": {"cpu": "Intel Core i7-14700K", "gpu": "RTX 4080 Super", "ram": "32 GB DDR5"},
-                "cpu_usage": telemetry.get("cpu_usage", 22 if status == "BUSY" else 5),
-                "memory_usage": telemetry.get("memory_usage", 45 if status == "BUSY" else 16),
-                "gpu_usage": telemetry.get("gpu_usage", 70 if status == "BUSY" else 0),
-                "processes": telemetry.get("processes", []),
-                "last_heartbeat": telemetry.get("last_heartbeat"),
-            })
-                "zone": "VIP" if i > 5 else "Standard",
-                "status": telemetry.get("status", "FREE" if is_online else "OFFLINE"),
-                "online": is_online,
-                "current_user": telemetry.get("current_user"),
-                "remaining_seconds": telemetry.get("remaining_seconds", 0),
-                "current_game": telemetry.get("active_game"),
-                "alert": telemetry.get("alert"),
-                "specs": {},
-            })
+            result.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "pc_id": key,
+                    "label": label,
+                    "name": f"PC-{i:02d}",
+                    "zone": "VIP" if i > 5 else "Standard",
+                    "status": status,
+                    "online": is_online,
+                    "current_user": telemetry.get("current_user"),
+                    "remaining_seconds": telemetry.get("remaining_seconds", 0),
+                    "current_game": telemetry.get("active_game"),
+                    "alert": telemetry.get("alert"),
+                    "specs": {"cpu": "Intel Core i7-14700K", "gpu": "RTX 4080 Super", "ram": "32 GB DDR5"},
+                    "cpu_usage": telemetry.get("cpu_usage", 22 if status == "BUSY" else 5),
+                    "memory_usage": telemetry.get("memory_usage", 45 if status == "BUSY" else 16),
+                    "gpu_usage": telemetry.get("gpu_usage", 70 if status == "BUSY" else 0),
+                    "processes": telemetry.get("processes", []),
+                    "last_heartbeat": telemetry.get("last_heartbeat"),
+                }
+            )
 
     return result
 

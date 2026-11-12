@@ -190,6 +190,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/clubs/{club_id}/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Packages
+         * @description Fixed-price packages of a club. Book one by sending its id as `package_id`.
+         *
+         *     `is_night` marks packages whose window includes the restricted night hours (18+).
+         */
+        get: operations["list_packages_v1_clubs__club_id__packages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pcs/{pc_id}/availability": {
         parameters: {
             query?: never;
@@ -514,6 +536,326 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pc/{pc_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock Pc
+         * @description Send UNLOCK to a connected PC kiosk client with user authentication.
+         */
+        post: operations["unlock_pc_v1_pc__pc_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pc/{pc_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock Pc
+         * @description Send LOCK to a connected PC kiosk client.
+         */
+        post: operations["lock_pc_v1_pc__pc_id__lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pc/{pc_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Session
+         * @description Add time to an active session on station and push WebSocket update.
+         */
+        post: operations["extend_session_v1_pc__pc_id__extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pc/{pc_id}/call-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call Admin
+         * @description Send emergency or support call to Admin/Cashier panel.
+         */
+        post: operations["call_admin_v1_pc__pc_id__call_admin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pc/{pc_id}/clear-alert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Alert
+         * @description Clear active alert from a station.
+         */
+        post: operations["clear_alert_v1_pc__pc_id__clear_alert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/pc/{pc_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Place Station Order
+         * @description Player orders snacks / energy drinks delivered to their station.
+         */
+        post: operations["place_station_order_v1_pc__pc_id__order_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/pcs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Pcs
+         * @description Return all club PCs with real-time merged status (Free, Busy, Offline, Alert).
+         */
+        get: operations["list_admin_pcs_v1_admin_pcs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tariffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Tariffs
+         * @description List club tariffs available for assignment.
+         */
+        get: operations["list_admin_tariffs_v1_admin_tariffs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock Pc
+         * @description Send UNLOCK to a connected PC kiosk client with user authentication.
+         */
+        post: operations["unlock_pc_api_pc__pc_id__unlock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock Pc
+         * @description Send LOCK to a connected PC kiosk client.
+         */
+        post: operations["lock_pc_api_pc__pc_id__lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend Session
+         * @description Add time to an active session on station and push WebSocket update.
+         */
+        post: operations["extend_session_api_pc__pc_id__extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/call-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call Admin
+         * @description Send emergency or support call to Admin/Cashier panel.
+         */
+        post: operations["call_admin_api_pc__pc_id__call_admin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/clear-alert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Alert
+         * @description Clear active alert from a station.
+         */
+        post: operations["clear_alert_api_pc__pc_id__clear_alert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc/{pc_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Place Station Order
+         * @description Player orders snacks / energy drinks delivered to their station.
+         */
+        post: operations["place_station_order_api_pc__pc_id__order_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/pcs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Pcs
+         * @description Return all club PCs with real-time merged status (Free, Busy, Offline, Alert).
+         */
+        get: operations["list_admin_pcs_api_admin_pcs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/tariffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Tariffs
+         * @description List club tariffs available for assignment.
+         */
+        get: operations["list_admin_tariffs_api_admin_tariffs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -619,11 +961,10 @@ export interface components {
              * Format: date-time
              */
             starts_at: string;
-            /**
-             * Ends At
-             * Format: date-time
-             */
-            ends_at: string;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Package Id */
+            package_id?: string | null;
         };
         /** BookingOut */
         BookingOut: {
@@ -666,6 +1007,8 @@ export interface components {
             hold_expires_at: string | null;
             /** Price Kzt */
             price_kzt: number;
+            /** Package Id */
+            package_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -693,6 +1036,16 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
+        };
+        /** CallAdminRequest */
+        CallAdminRequest: {
+            /**
+             * Reason
+             * @default Assistance
+             */
+            reason: string;
+            /** Message */
+            message?: string | null;
         };
         /** ClubCreate */
         ClubCreate: {
@@ -750,6 +1103,25 @@ export interface components {
             /** Is Active */
             is_active?: boolean | null;
         };
+        /** CommandResult */
+        CommandResult: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ExtendRequest */
+        ExtendRequest: {
+            /**
+             * Additional Seconds
+             * @default 1800
+             */
+            additional_seconds: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -766,6 +1138,27 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
+        };
+        /** OrderItem */
+        OrderItem: {
+            /** Name */
+            name: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+            /** Price Kzt */
+            price_kzt: number;
+        };
+        /** OrderRequest */
+        OrderRequest: {
+            /** Items */
+            items: components["schemas"]["OrderItem"][];
+            /** Total Kzt */
+            total_kzt: number;
+            /** Note */
+            note?: string | null;
         };
         /** OtpRequest */
         OtpRequest: {
@@ -787,6 +1180,43 @@ export interface components {
              * @example 000000
              */
             code: string;
+        };
+        /** PackageOut */
+        PackageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Club Id
+             * Format: uuid
+             */
+            club_id: string;
+            /**
+             * Zone Id
+             * Format: uuid
+             */
+            zone_id: string;
+            /** Zone Name */
+            zone_name: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "duration" | "window";
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Price Kzt */
+            price_kzt: number;
+            /** Is Night */
+            is_night: boolean;
         };
         /** PaymentCreate */
         PaymentCreate: {
@@ -920,6 +1350,20 @@ export interface components {
             token_type: string;
             /** Expires In */
             expires_in: number;
+        };
+        /** UnlockRequest */
+        UnlockRequest: {
+            /** Username */
+            username: string;
+            /** Password */
+            password?: string | null;
+            /**
+             * Remaining Seconds
+             * @default 3600
+             */
+            remaining_seconds: number;
+            /** Tariff Id */
+            tariff_id?: string | null;
         };
         /** UserOut */
         UserOut: {
@@ -1332,6 +1776,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PcOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_packages_v1_clubs__club_id__packages_get: {
+        parameters: {
+            query?: {
+                zone_id?: string | null;
+            };
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageOut"][];
                 };
             };
             /** @description Validation Error */
@@ -2052,6 +2529,498 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlock_pc_v1_pc__pc_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_pc_v1_pc__pc_id__lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_session_v1_pc__pc_id__extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    call_admin_v1_pc__pc_id__call_admin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallAdminRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_alert_v1_pc__pc_id__clear_alert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    place_station_order_v1_pc__pc_id__order_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_pcs_v1_admin_pcs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    list_admin_tariffs_v1_admin_tariffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    unlock_pc_api_pc__pc_id__unlock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnlockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lock_pc_api_pc__pc_id__lock_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_session_api_pc__pc_id__extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    call_admin_api_pc__pc_id__call_admin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallAdminRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_alert_api_pc__pc_id__clear_alert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    place_station_order_api_pc__pc_id__order_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_pcs_api_admin_pcs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    list_admin_tariffs_api_admin_tariffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };

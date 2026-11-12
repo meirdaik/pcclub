@@ -15,7 +15,7 @@ from sqlalchemy import select
 from app.core import security
 from app.core.config import get_settings
 from app.core.db import get_engine, get_sessionmaker
-from app.models import Club, Organization, Pc, StaffRole, StaffUser, Zone
+from app.models import Club, Organization, Package, Pc, StaffRole, StaffUser, Zone
 
 
 async def create_owner(org_name: str, email: str, password: str) -> None:
@@ -39,7 +39,7 @@ async def create_owner(org_name: str, email: str, password: str) -> None:
 
 
 async def seed_demo() -> None:
-    """A demo club with two zones and ten PCs, for local development only."""
+    """One demo club with zones, PCs and packages, for local development only."""
     if get_settings().environment == "prod":
         sys.exit("seed-demo is not available in production")
     async with get_sessionmaker()() as session:
@@ -54,28 +54,66 @@ async def seed_demo() -> None:
             opens_at=None,
             closes_at=None,
         )
-        daytime = Club(
-            organization_id=org.id,
-            name="Demo Daytime",
-            city="Astana",
-            address="Mangilik El 1",
-            opens_at=time(10),
-            closes_at=time(23),
-        )
-        session.add_all([club, daytime])
+        session.add(club)
         await session.flush()
-        standard = Zone(club_id=club.id, name="Standard", price_per_hour_kzt=800)
-        vip = Zone(club_id=club.id, name="VIP", price_per_hour_kzt=1500)
-        day = Zone(club_id=daytime.id, name="Standard", price_per_hour_kzt=700)
-        session.add_all([standard, vip, day])
-        await session.flush()
-        session.add_all(
-            [Pc(club_id=club.id, zone_id=standard.id, label=f"S-{n:02d}") for n in range(1, 7)]
-            + [Pc(club_id=club.id, zone_id=vip.id, label=f"VIP-{n:02d}") for n in range(1, 5)]
-            + [Pc(club_id=daytime.id, zone_id=day.id, label=f"D-{n:02d}") for n in range(1, 5)]
-        )
+        # Demo Arena follows a real club price list: three zones, each with an hourly price,
+        # "2+1" and "3+2" hour bundles, a day window and a night window (18+).
+        # zone name: (PC label prefix, PCs, hourly, 2+1 hours, 3+2 hours, day, night) in tenge
+        arena_zones = {
+            "Standart": ("S", 6, 630, 1260, 1890, 1050, 2100),
+            "5x5 Zona": ("5X5", 5, 980, 1960, 2940, 1400, 2940),
+            "VIP Zona": ("VIP", 4, 1050, 2100, 3150, 1750, 3150),
+        }
+        for name, (
+            prefix,
+            pcs,
+            hourly,
+            two_plus_one,
+            three_plus_two,
+            day,
+            night,
+        ) in arena_zones.items():
+            zone = Zone(club_id=club.id, name=name, price_per_hour_kzt=hourly)
+            session.add(zone)
+            await session.flush()
+            session.add_all(
+                [
+                    Pc(club_id=club.id, zone_id=zone.id, label=f"{prefix}-{n:02d}")
+                    for n in range(1, pcs + 1)
+                ]
+            )
+            session.add_all(
+                [
+                    Package(
+                        zone_id=zone.id,
+                        name="2+1 час",
+                        duration_minutes=180,
+                        price_kzt=two_plus_one,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="3+2 час",
+                        duration_minutes=300,
+                        price_kzt=three_plus_two,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="День",
+                        window_start=time(8),
+                        window_end=time(18),
+                        price_kzt=day,
+                    ),
+                    Package(
+                        zone_id=zone.id,
+                        name="Ночь",
+                        window_start=time(22),
+                        window_end=time(8),
+                        price_kzt=night,
+                    ),
+                ]
+            )
         await session.commit()
-    print("Seeded demo clubs: Demo Arena (Almaty, 24/7), Demo Daytime (Astana, 10:00-23:00)")
+    print("Seeded the demo club with hourly prices and packages: Demo Arena (Almaty, 24/7)")
 
 
 async def _run(args: argparse.Namespace) -> None:
@@ -97,7 +135,7 @@ def main() -> None:
     owner = sub.add_parser("create-owner", help="create an organization and its owner account")
     owner.add_argument("--org", required=True, help="organization (legal entity) name")
     owner.add_argument("--email", required=True)
-    sub.add_parser("seed-demo", help="insert demo clubs, zones and PCs (dev only)")
+    sub.add_parser("seed-demo", help="insert the demo club, zones and PCs (dev only)")
     asyncio.run(_run(parser.parse_args()))
 
 

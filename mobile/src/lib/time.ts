@@ -12,6 +12,15 @@ export type LocalDateTime = {
   minute: number;
 };
 
+/**
+ * Epoch milliseconds of an API timestamp. The API sends microseconds
+ * (`2026-11-12T07:00:00.123456Z`), but JavaScript only promises to parse three fractional
+ * digits and the phone's engine (Hermes) is stricter than browsers, so extra digits are cut.
+ */
+export function parseInstant(iso: string): number {
+  return Date.parse(iso.replace(/(\.\d{3})\d+/, '$1'));
+}
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatterFor(timeZone: string): Intl.DateTimeFormat {

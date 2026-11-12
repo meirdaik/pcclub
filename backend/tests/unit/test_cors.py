@@ -27,7 +27,25 @@ async def test_dev_allows_localhost_origins(origin: str) -> None:
 
 @pytest.mark.parametrize(
     "origin",
-    ["https://evil.example", "http://localhost.evil.example", "https://localhost:8081"],
+    ["http://192.168.1.50:5173", "http://10.0.0.7:8081", "http://172.16.0.1", "http://172.31.9.9"],
+)
+async def test_dev_allows_private_lan_origins(origin: str) -> None:
+    response = await _get_health(_settings(environment="dev"), origin)
+    assert response.headers["access-control-allow-origin"] == origin
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://evil.example",
+        "http://localhost.evil.example",
+        "https://localhost:8081",
+        "https://192.168.1.50:5173",
+        "http://8.8.8.8",
+        "http://172.15.0.1",
+        "http://172.32.0.1",
+        "http://192.168.1.50.evil.example",
+    ],
 )
 async def test_dev_rejects_other_origins(origin: str) -> None:
     response = await _get_health(_settings(environment="dev"), origin)

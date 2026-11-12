@@ -517,6 +517,71 @@
         }
       }
     },
+    "/v1/clubs/{club_id}/packages": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Packages",
+        "description": "Fixed-price packages of a club. Book one by sending its id as `package_id`.\n\n`is_night` marks packages whose window includes the restricted night hours (18+).",
+        "operationId": "list_packages_v1_clubs__club_id__packages_get",
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Club Id"
+            }
+          },
+          {
+            "name": "zone_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Zone Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PackageOut"
+                  },
+                  "title": "Response List Packages V1 Clubs  Club Id  Packages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pcs/{pc_id}/availability": {
       "get": {
         "tags": [
@@ -1683,6 +1748,710 @@
         }
       }
     },
+    "/v1/pc/{pc_id}/unlock": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Unlock Pc",
+        "description": "Send UNLOCK to a connected PC kiosk client with user authentication.",
+        "operationId": "unlock_pc_v1_pc__pc_id__unlock_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pc/{pc_id}/lock": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Lock Pc",
+        "description": "Send LOCK to a connected PC kiosk client.",
+        "operationId": "lock_pc_v1_pc__pc_id__lock_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pc/{pc_id}/extend": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Extend Session",
+        "description": "Add time to an active session on station and push WebSocket update.",
+        "operationId": "extend_session_v1_pc__pc_id__extend_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pc/{pc_id}/call-admin": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Call Admin",
+        "description": "Send emergency or support call to Admin/Cashier panel.",
+        "operationId": "call_admin_v1_pc__pc_id__call_admin_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallAdminRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pc/{pc_id}/clear-alert": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Clear Alert",
+        "description": "Clear active alert from a station.",
+        "operationId": "clear_alert_v1_pc__pc_id__clear_alert_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pc/{pc_id}/order": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Place Station Order",
+        "description": "Player orders snacks / energy drinks delivered to their station.",
+        "operationId": "place_station_order_v1_pc__pc_id__order_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/pcs": {
+      "get": {
+        "tags": [
+          "admin-kiosk"
+        ],
+        "summary": "List Admin Pcs",
+        "description": "Return all club PCs with real-time merged status (Free, Busy, Offline, Alert).",
+        "operationId": "list_admin_pcs_v1_admin_pcs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Admin Pcs V1 Admin Pcs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/tariffs": {
+      "get": {
+        "tags": [
+          "admin-kiosk"
+        ],
+        "summary": "List Admin Tariffs",
+        "description": "List club tariffs available for assignment.",
+        "operationId": "list_admin_tariffs_v1_admin_tariffs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Admin Tariffs V1 Admin Tariffs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/unlock": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Unlock Pc",
+        "description": "Send UNLOCK to a connected PC kiosk client with user authentication.",
+        "operationId": "unlock_pc_api_pc__pc_id__unlock_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/lock": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Lock Pc",
+        "description": "Send LOCK to a connected PC kiosk client.",
+        "operationId": "lock_pc_api_pc__pc_id__lock_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/extend": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Extend Session",
+        "description": "Add time to an active session on station and push WebSocket update.",
+        "operationId": "extend_session_api_pc__pc_id__extend_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/call-admin": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Call Admin",
+        "description": "Send emergency or support call to Admin/Cashier panel.",
+        "operationId": "call_admin_api_pc__pc_id__call_admin_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallAdminRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/clear-alert": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Clear Alert",
+        "description": "Clear active alert from a station.",
+        "operationId": "clear_alert_api_pc__pc_id__clear_alert_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pc/{pc_id}/order": {
+      "post": {
+        "tags": [
+          "pc-control"
+        ],
+        "summary": "Place Station Order",
+        "description": "Player orders snacks / energy drinks delivered to their station.",
+        "operationId": "place_station_order_api_pc__pc_id__order_post",
+        "parameters": [
+          {
+            "name": "pc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/pcs": {
+      "get": {
+        "tags": [
+          "admin-kiosk"
+        ],
+        "summary": "List Admin Pcs",
+        "description": "Return all club PCs with real-time merged status (Free, Busy, Offline, Alert).",
+        "operationId": "list_admin_pcs_api_admin_pcs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Admin Pcs Api Admin Pcs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/tariffs": {
+      "get": {
+        "tags": [
+          "admin-kiosk"
+        ],
+        "summary": "List Admin Tariffs",
+        "description": "List club tariffs available for assignment.",
+        "operationId": "list_admin_tariffs_api_admin_tariffs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Admin Tariffs Api Admin Tariffs Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -1872,16 +2641,34 @@
             "title": "Starts At"
           },
           "ends_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ends At"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
           }
         },
         "type": "object",
         "required": [
           "pc_id",
-          "starts_at",
-          "ends_at"
+          "starts_at"
         ],
         "title": "BookingCreate"
       },
@@ -1945,6 +2732,18 @@
             "type": "integer",
             "title": "Price Kzt"
           },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1974,6 +2773,7 @@
           "status",
           "hold_expires_at",
           "price_kzt",
+          "package_id",
           "created_at",
           "cancelled_at"
         ],
@@ -2027,6 +2827,28 @@
           "ends_at"
         ],
         "title": "BusyInterval"
+      },
+      "CallAdminRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "Assistance"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "title": "CallAdminRequest"
       },
       "ClubCreate": {
         "properties": {
@@ -2245,6 +3067,48 @@
         "type": "object",
         "title": "ClubUpdate"
       },
+      "CommandResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "detail"
+        ],
+        "title": "CommandResult"
+      },
+      "ExtendRequest": {
+        "properties": {
+          "additional_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Additional Seconds",
+            "default": 1800
+          }
+        },
+        "type": "object",
+        "title": "ExtendRequest"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2290,6 +3154,61 @@
         ],
         "title": "IdentitySubmit"
       },
+      "OrderItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity",
+            "default": 1
+          },
+          "price_kzt": {
+            "type": "integer",
+            "title": "Price Kzt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "price_kzt"
+        ],
+        "title": "OrderItem"
+      },
+      "OrderRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_kzt": {
+            "type": "integer",
+            "title": "Total Kzt"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_kzt"
+        ],
+        "title": "OrderRequest"
+      },
       "OtpRequest": {
         "properties": {
           "phone": {
@@ -2332,6 +3251,99 @@
           "code"
         ],
         "title": "OtpVerify"
+      },
+      "PackageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "club_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Club Id"
+          },
+          "zone_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Zone Id"
+          },
+          "zone_name": {
+            "type": "string",
+            "title": "Zone Name"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "duration",
+              "window"
+            ],
+            "title": "Kind"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "price_kzt": {
+            "type": "integer",
+            "title": "Price Kzt"
+          },
+          "is_night": {
+            "type": "boolean",
+            "title": "Is Night"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "club_id",
+          "zone_id",
+          "zone_name",
+          "name",
+          "kind",
+          "duration_minutes",
+          "window_start",
+          "window_end",
+          "price_kzt",
+          "is_night"
+        ],
+        "title": "PackageOut"
       },
       "PaymentCreate": {
         "properties": {
@@ -2649,6 +3661,49 @@
           "expires_in"
         ],
         "title": "TokenPair"
+      },
+      "UnlockRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "remaining_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Remaining Seconds",
+            "default": 3600
+          },
+          "tariff_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tariff Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "title": "UnlockRequest"
       },
       "UserOut": {
         "properties": {

@@ -35,7 +35,9 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(120), unique=True, index=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     balance_kzt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    role: Mapped[str] = mapped_column(String(20), nullable=False, default="player")  # "player" or "admin"
+    role: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="player"
+    )  # "player" or "admin"
     first_name: Mapped[str | None] = mapped_column(String(100))
     last_name: Mapped[str | None] = mapped_column(String(100))
 

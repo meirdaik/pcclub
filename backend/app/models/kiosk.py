@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, JSON, String
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, created_at_column, tz_datetime, uuid_fk_type, uuid_pk
@@ -25,7 +25,9 @@ class Tariff(Base):
         uuid_fk_type, ForeignKey("clubs.id", ondelete="CASCADE"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    zone: Mapped[str] = mapped_column(String(50), nullable=False, default="Standard")  # "Standard", "VIP"
+    zone: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="Standard"
+    )  # "Standard", "VIP"
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     price_kzt: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -74,7 +76,9 @@ class Transaction(Base):
         uuid_fk_type, ForeignKey("pcs.id", ondelete="SET NULL"), nullable=True
     )
     amount_kzt: Mapped[int] = mapped_column(Integer, nullable=False)
-    type: Mapped[str] = mapped_column(String(50), nullable=False, default="DEPOSIT")  # DEPOSIT, SESSION, SNACK
+    type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="DEPOSIT"
+    )  # DEPOSIT, SESSION, SNACK
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="SUCCEEDED")
     created_at: Mapped[datetime] = created_at_column()
@@ -97,7 +101,9 @@ class SnackOrder(Base):
     items: Mapped[dict[str, Any] | list[Any]] = mapped_column(JSON, nullable=False, default=list)
     amount_kzt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="PENDING")  # PENDING, DELIVERED, CANCELLED
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="PENDING"
+    )  # PENDING, DELIVERED, CANCELLED
     created_at: Mapped[datetime] = created_at_column()
 
     @property

@@ -57,6 +57,22 @@ class PcOut(BaseModel):
     available: bool | None = None
 
 
+class PackageOut(BaseModel):
+    id: uuid.UUID
+    club_id: uuid.UUID
+    zone_id: uuid.UUID
+    zone_name: str
+    name: str
+    kind: Literal["duration", "window"]
+    duration_minutes: int | None  # kind "duration": this long from the chosen start
+    window_start: time | None  # kind "window": club-local; the booking runs until window_end
+    window_end: time | None
+    price_kzt: int
+    # The window includes restricted night hours, so it is 18+. A label for clients only: the
+    # age rule is always enforced on the actual booking interval.
+    is_night: bool
+
+
 class BusyInterval(BaseModel):
     starts_at: datetime
     ends_at: datetime

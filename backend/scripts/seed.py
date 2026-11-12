@@ -3,15 +3,13 @@ Populates admin account, test player, 10 gaming PCs (Standard/VIP), and tariffs.
 """
 
 import asyncio
-import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 
 from app.core.db import Base, get_engine, get_sessionmaker
 from app.core.security import hash_password
 from app.models.club import Club, Pc, Zone
-from app.models.kiosk import GamingSession, SnackOrder, Tariff, Transaction
+from app.models.kiosk import Tariff
 from app.models.organization import Organization
 from app.models.user import IdentityStatus, User
 
@@ -135,7 +133,9 @@ async def seed() -> None:
                 zone = vip_zone if is_vip else std_zone
                 specs = {
                     "cpu": "Intel Core i7-14700KF" if is_vip else "Intel Core i5-13400F",
-                    "gpu": "NVIDIA GeForce RTX 4080 Super 16GB" if is_vip else "NVIDIA GeForce RTX 4060 8GB",
+                    "gpu": "NVIDIA GeForce RTX 4080 Super 16GB"
+                    if is_vip
+                    else "NVIDIA GeForce RTX 4060 8GB",
                     "ram": "64 GB DDR5-6000" if is_vip else "32 GB DDR5-5200",
                     "monitor": "32' OLED 360Hz QHD" if is_vip else "27' Fast IPS 240Hz FHD",
                     "keyboard": "SteelSeries Apex Pro TKL" if is_vip else "HyperX Alloy Origins",
@@ -147,7 +147,7 @@ async def seed() -> None:
                     zone_id=zone.id,
                     label=label,
                     name=f"PC-{i:02d}",
-                    status="FREE",
+                    session_status="FREE",
                     remaining_seconds=0,
                     specs=specs,
                 )

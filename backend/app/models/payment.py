@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, tz_datetime, uuid_fk_type, uuid_pk

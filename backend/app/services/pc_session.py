@@ -30,9 +30,9 @@ class PcSessionManager:
         old = self._connections.get(pc_id)
         if old is not None:
             logger.warning("PC %s: replacing stale connection", pc_id)
-            try:
+            try:  # noqa: SIM105
                 await old.close(code=1012, reason="replaced")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
         self._connections[pc_id] = ws
 
@@ -71,7 +71,9 @@ class PcSessionManager:
             self._aliases.pop(k, None)
         logger.info("PC %s: disconnected", pc_id)
 
-    async def send_command(self, pc_id: str, action: str, data: dict[str, Any] | None = None) -> bool:
+    async def send_command(
+        self, pc_id: str, action: str, data: dict[str, Any] | None = None
+    ) -> bool:
         """Send a JSON command to a connected PC. Returns ``True`` on success."""
         target_id = self._aliases.get(pc_id, pc_id)
         ws = self._connections.get(target_id)
@@ -92,8 +94,12 @@ class PcSessionManager:
                 if target_id not in self._telemetry:
                     self._telemetry[target_id] = {}
                 self._telemetry[target_id]["status"] = "BUSY"
-                self._telemetry[target_id]["current_user"] = data.get("username", "Guest") if data else "Guest"
-                self._telemetry[target_id]["remaining_seconds"] = data.get("remaining_seconds", 3600) if data else 3600
+                self._telemetry[target_id]["current_user"] = (
+                    data.get("username", "Guest") if data else "Guest"
+                )
+                self._telemetry[target_id]["remaining_seconds"] = (
+                    data.get("remaining_seconds", 3600) if data else 3600
+                )
             elif action == "LOCK":
                 if target_id in self._telemetry:
                     self._telemetry[target_id]["status"] = "FREE"
@@ -101,12 +107,14 @@ class PcSessionManager:
                     self._telemetry[target_id]["remaining_seconds"] = 0
                     self._telemetry[target_id]["active_game"] = None
                     self._telemetry[target_id]["alert"] = None
-            elif action == "EXTEND":
+            elif action == "EXTEND":  # noqa: SIM102
                 if target_id in self._telemetry and data:
-                    self._telemetry[target_id]["remaining_seconds"] = data.get("remaining_seconds", 0)
+                    self._telemetry[target_id]["remaining_seconds"] = data.get(
+                        "remaining_seconds", 0
+                    )
 
             return True
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("PC %s: failed to send command %s", target_id, action, exc_info=True)
             await self.disconnect(target_id)
             return False
@@ -117,14 +125,17 @@ class PcSessionManager:
 
     def update_telemetry(self, pc_id: str, data: dict[str, Any]) -> None:
         target = self._aliases.get(pc_id, pc_id)
-        existing = self._telemetry.setdefault(target, {
-            "pc_id": target,
-            "status": "FREE",
-            "current_user": None,
-            "remaining_seconds": 0,
-            "active_game": None,
-            "alert": None,
-        })
+        existing = self._telemetry.setdefault(
+            target,
+            {
+                "pc_id": target,
+                "status": "FREE",
+                "current_user": None,
+                "remaining_seconds": 0,
+                "active_game": None,
+                "alert": None,
+            },
+        )
         existing["last_heartbeat"] = time.time()
 
         if "status" in data:
@@ -145,13 +156,16 @@ class PcSessionManager:
 
     def set_alert(self, pc_id: str, alert_message: str) -> None:
         target = self._aliases.get(pc_id, pc_id)
-        record = self._telemetry.setdefault(target, {
-            "pc_id": target,
-            "status": "FREE",
-            "current_user": None,
-            "remaining_seconds": 0,
-            "active_game": None,
-        })
+        record = self._telemetry.setdefault(
+            target,
+            {
+                "pc_id": target,
+                "status": "FREE",
+                "current_user": None,
+                "remaining_seconds": 0,
+                "active_game": None,
+            },
+        )
         record["alert"] = alert_message
         record["status"] = "ALERT"
         record["last_heartbeat"] = time.time()
@@ -167,15 +181,18 @@ class PcSessionManager:
 
     def get_pc_state(self, pc_id: str) -> dict[str, Any]:
         target = self._aliases.get(pc_id, pc_id)
-        state = self._telemetry.get(target, {
-            "pc_id": target,
-            "status": "ONLINE" if self.is_online(target) else "OFFLINE",
-            "current_user": None,
-            "remaining_seconds": 0,
-            "active_game": None,
-            "alert": None,
-            "last_heartbeat": 0,
-        }).copy()
+        state = self._telemetry.get(
+            target,
+            {
+                "pc_id": target,
+                "status": "ONLINE" if self.is_online(target) else "OFFLINE",
+                "current_user": None,
+                "remaining_seconds": 0,
+                "active_game": None,
+                "alert": None,
+                "last_heartbeat": 0,
+            },
+        ).copy()
         state["online"] = self.is_online(target)
         return state
 
