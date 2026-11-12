@@ -4,10 +4,10 @@
   "description": "PC Club Cashier & Club Administration Management Console",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite --port 5174",
+    "dev": "vite --port 5174 --host 127.0.0.1",
     "build": "tsc && vite build && tsc -p tsconfig.electron.json",
     "preview": "vite preview --port 5174",
-    "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite --port 5174\" \"wait-on http://127.0.0.1:5174 && electron .\"",
+    "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite --port 5174 --host 127.0.0.1\" \"wait-on http://127.0.0.1:5174 && electron .\"",
     "dist": "npm run build && electron-builder --win",
     "dist:portable": "npm run build && electron-builder --win portable",
     "dist:dir": "npm run build && electron-builder --dir"
