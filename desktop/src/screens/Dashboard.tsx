@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SessionInfo, GameItem, MenuItem, CartItem, SystemStats } from '../types';
+import { socketService } from '../services/socket';
 
 interface DashboardProps {
   session: SessionInfo;
@@ -192,6 +193,46 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   // System stats
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
 
+  // Low-time warning notification state
+  const [lowTimeAlert, setLowTimeAlert] = useState<string | null>(null);
+  const warned300 = useRef(false);
+  const warned60 = useRef(false);
+
+  const playAlertTone = (freq = 750, count = 2) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      for (let i = 0; i < count; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.22);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.22);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.22 + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.22);
+        osc.stop(ctx.currentTime + i * 0.22 + 0.16);
+      }
+    } catch {
+      // Audio autoplay may be muted
+    }
+  };
+
+  // Low-time warning checks at 300s (5m) and 60s (1m)
+  useEffect(() => {
+    if (secondsLeft <= 300 && secondsLeft > 60 && !warned300.current) {
+      warned300.current = true;
+      playAlertTone(700, 2);
+      setLowTimeAlert('⚠️ 5 MINUTES REMAINING — Please top up balance via mobile app or cashier to avoid session termination!');
+    } else if (secondsLeft <= 60 && secondsLeft > 0 && !warned60.current) {
+      warned60.current = true;
+      playAlertTone(950, 3);
+      setLowTimeAlert('🚨 1 MINUTE REMAINING — Station locking soon! Active games will close.');
+    }
+  }, [secondsLeft]);
+
   // Session timer
   useEffect(() => {
     setSecondsLeft(session.remainingSeconds);
@@ -243,6 +284,9 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
     // Launch native game via Electron IPC
     const target = game.uriScheme || game.exePath;
     setLaunchToast(`Starting ${game.name}...`);
+
+    // Report active game process in heartbeat telemetry
+    socketService.updateSessionTelemetry('ACTIVE', secondsLeft, game.name, session.username);
 
     try {
       if (window.electronAPI) {
@@ -437,6 +481,38 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
           </button>
         </div>
       </header>
+
+      {/* Low-Time Warning Notification Banner */}
+      {lowTimeAlert && (
+        <div
+          className="warning-banner-pulse"
+          style={{
+            margin: '0 24px 12px 24px',
+            padding: '12px 20px',
+            backgroundColor: 'rgba(255, 0, 85, 0.25)',
+            border: '2px solid #ff0055',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#fff',
+            fontWeight: 'bold',
+            zIndex: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '20px' }}>⚠️</span>
+            <span>{lowTimeAlert}</span>
+          </div>
+          <button
+            onClick={() => setLowTimeAlert(null)}
+            className="cyber-button secondary"
+            style={{ padding: '6px 14px', fontSize: '11px' }}
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
 
       {/* SENET Navigation Bar */}
       <nav style={styles.navBar}>
@@ -1105,11 +1181,17 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     border: '1px solid var(--border-neon)',
     background: '#0e1224',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '540px',
+    height: '100%',
   },
   inAppIframe: {
     width: '100%',
     height: '100%',
+    flex: 1,
     border: 'none',
+    display: 'flex',
   },
   barPane: {
     width: '100%',

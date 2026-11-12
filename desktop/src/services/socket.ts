@@ -3,12 +3,12 @@ import { ServerMessage, ClientMessage } from '../types';
 type MessageHandler = (message: ServerMessage) => void;
 
 const PC_ID = import.meta.env.VITE_PC_ID || 'pc-001';
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000';
 const AUTH_TOKEN = import.meta.env.VITE_PC_AUTH_TOKEN || 'dev-pc-token';
 
-const HEARTBEAT_INTERVAL = 30_000;
+const HEARTBEAT_INTERVAL = 5_000; // 5 seconds telemetry heartbeat
 const BASE_RECONNECT_DELAY = 1_000;
-const MAX_RECONNECT_DELAY = 30_000;
+const MAX_RECONNECT_DELAY = 15_000;
 
 class SocketService {
   private ws: WebSocket | null = null;
@@ -18,44 +18,71 @@ class SocketService {
   private reconnectAttempt = 0;
   private shouldReconnect = true;
 
+  // Live telemetry state
+  private currentStatus: 'LOCKED' | 'ACTIVE' = 'LOCKED';
+  private remainingSeconds = 0;
+  private activeGame: string | null = null;
+  private currentUser: string | null = null;
+
   connect(): void {
     this.shouldReconnect = true;
     this.reconnectAttempt = 0;
     this.doConnect();
   }
 
+  updateSessionTelemetry(
+    status: 'LOCKED' | 'ACTIVE',
+    remainingSeconds: number,
+    activeGame?: string | null,
+    currentUser?: string | null,
+  ): void {
+    this.currentStatus = status;
+    this.remainingSeconds = remainingSeconds;
+    if (activeGame !== undefined) this.activeGame = activeGame;
+    if (currentUser !== undefined) this.currentUser = currentUser;
+
+    // Immediately trigger a heartbeat ping when state changes
+    this.sendHeartbeat();
+  }
+
   private doConnect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     const url = `${WS_URL}/ws/pc/${PC_ID}`;
-    console.log(`[Socket] Connecting to ${url}...`);
+    console.log(`[SENET Socket] Connecting to ${url}...`);
 
-    this.ws = new WebSocket(url);
+    try {
+      this.ws = new WebSocket(url);
+    } catch (err) {
+      console.warn('[SENET Socket] Connection error:', err);
+      this.scheduleReconnect();
+      return;
+    }
 
     this.ws.onopen = () => {
-      console.log('[Socket] Connected');
+      console.log('[SENET Socket] Connected to club server');
       this.reconnectAttempt = 0;
 
-      // Send auth message
+      // Send authentication handshake
       const authMsg: ClientMessage = { type: 'auth', token: AUTH_TOKEN };
       this.ws?.send(JSON.stringify(authMsg));
 
-      // Start heartbeat
+      // Start 5-second heartbeat telemetry
       this.startHeartbeat();
     };
 
     this.ws.onmessage = (event: MessageEvent) => {
       try {
         const message = JSON.parse(event.data) as ServerMessage;
-        console.log('[Socket] Received:', message);
+        console.log('[SENET Socket] Message received:', message);
         this.handlers.forEach((handler) => handler(message));
       } catch (err) {
-        console.error('[Socket] Failed to parse message:', err);
+        console.error('[SENET Socket] Failed to parse server message:', err);
       }
     };
 
     this.ws.onclose = () => {
-      console.log('[Socket] Disconnected');
+      console.log('[SENET Socket] Disconnected');
       this.stopHeartbeat();
       if (this.shouldReconnect) {
         this.scheduleReconnect();
@@ -63,19 +90,70 @@ class SocketService {
     };
 
     this.ws.onerror = (err) => {
-      console.error('[Socket] Error:', err);
+      console.error('[SENET Socket] Socket error:', err);
       this.ws?.close();
     };
   }
 
   private startHeartbeat(): void {
     this.stopHeartbeat();
+    this.sendHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        const hb: ClientMessage = { type: 'heartbeat' };
-        this.ws.send(JSON.stringify(hb));
-      }
+      this.sendHeartbeat();
     }, HEARTBEAT_INTERVAL);
+  }
+
+  private sendHeartbeat(): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      const hb: ClientMessage = {
+        type: 'heartbeat',
+        pc_id: PC_ID,
+        status: this.currentStatus,
+        remaining_seconds: this.remainingSeconds,
+        active_game: this.activeGame || undefined,
+        current_user: this.currentUser || undefined,
+        timestamp: Date.now(),
+      };
+      this.ws.send(JSON.stringify(hb));
+    }
+  }
+
+  sendCallAdmin(message: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'call_admin',
+          pc_id: PC_ID,
+          message,
+          timestamp: Date.now(),
+        }),
+      );
+    }
+  }
+
+  sendOrderSnack(description: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'order_snack',
+          pc_id: PC_ID,
+          description,
+          timestamp: Date.now(),
+        }),
+      );
+    }
+  }
+
+  sendClearAlert(): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: 'clear_alert',
+          pc_id: PC_ID,
+          timestamp: Date.now(),
+        }),
+      );
+    }
   }
 
   private stopHeartbeat(): void {
@@ -90,7 +168,6 @@ class SocketService {
       BASE_RECONNECT_DELAY * Math.pow(2, this.reconnectAttempt),
       MAX_RECONNECT_DELAY,
     );
-    console.log(`[Socket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt + 1})...`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempt++;
       this.doConnect();

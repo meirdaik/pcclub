@@ -9,9 +9,10 @@ const MOBILE_APP_URL = import.meta.env.VITE_MOBILE_APP_URL || 'https://pcclub.kz
 
 interface LockScreenProps {
   onUnlock?: (session: SessionInfo) => void;
+  onOpenAdmin?: () => void;
 }
 
-export default function LockScreen({ onUnlock }: LockScreenProps) {
+export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [username, setUsername] = useState('');
@@ -46,11 +47,14 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
     setLoading(true);
     setError(null);
 
+    const isAdmin = trimmedUser.toLowerCase() === 'admin';
+
     // Call onUnlock immediately so the user enters without delay
     if (onUnlock) {
       onUnlock({
         username: trimmedUser,
-        remainingSeconds: 3600,
+        remainingSeconds: isAdmin ? 99999 : 3600,
+        isAdmin,
       });
     }
 
@@ -95,9 +99,21 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
           <span style={styles.logoDot}></span>
           <span style={styles.logoText}>CYBER CLUB ARENA</span>
         </div>
-        <div style={styles.clockContainer}>
-          <div style={styles.timeText}>{currentTime}</div>
-          <div style={styles.dateText}>{currentDate}</div>
+        <div style={styles.headerRightControls}>
+          {onOpenAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              className="cyber-button secondary"
+              style={styles.adminMapBtn}
+              title="Open Cashier & Club Administration Map"
+            >
+              🖥️ CASHIER MAP
+            </button>
+          )}
+          <div style={styles.clockContainer}>
+            <div style={styles.timeText}>{currentTime}</div>
+            <div style={styles.dateText}>{currentDate}</div>
+          </div>
         </div>
       </header>
 
@@ -230,6 +246,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     letterSpacing: '2px',
     color: '#f8fafc',
+  },
+  headerRightControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '24px',
+  },
+  adminMapBtn: {
+    padding: '8px 18px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    letterSpacing: '1px',
+    borderColor: 'rgba(0, 240, 255, 0.5)',
   },
   clockContainer: {
     textAlign: 'right',

@@ -96,10 +96,28 @@ async def pc_websocket(
     try:
         while True:
             data = await ws.receive_json()
-            msg_type = data.get("type") if isinstance(data, dict) else None
+            if not isinstance(data, dict):
+                continue
+
+            msg_type = data.get("type")
             if msg_type == "heartbeat":
-                await ws.send_json({"type": "heartbeat_ack"})
+                manager.update_telemetry(pc_key, data)
+                await ws.send_json({"type": "heartbeat_ack", "timestamp": data.get("timestamp")})
+            elif msg_type == "call_admin":
+                msg = data.get("message", "Player requested assistance at station")
+                manager.set_alert(pc_key, msg)
+                logger.info("PC %s: CALL ADMIN: %s", pc_key, msg)
+                await ws.send_json({"type": "alert_received", "status": "acknowledged"})
+            elif msg_type == "order_snack":
+                desc = data.get("description", "Food/Drink order placed")
+                manager.set_alert(pc_key, f"Order: {desc}")
+                logger.info("PC %s: SNACK ORDER: %s", pc_key, desc)
+                await ws.send_json({"type": "order_received", "status": "pending"})
+            elif msg_type == "clear_alert":
+                manager.clear_alert(pc_key)
+                await ws.send_json({"type": "alert_cleared"})
             elif msg_type == "status":
+                manager.update_telemetry(pc_key, data)
                 logger.debug("PC %s: status update: %s", pc_key, data)
             else:
                 logger.debug("PC %s: unknown message type: %s", pc_key, msg_type)

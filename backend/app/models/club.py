@@ -4,8 +4,7 @@ from enum import StrEnum
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Time, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, JSON, String, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, created_at_column, uuid_fk_type, uuid_pk
@@ -69,7 +68,6 @@ class Pc(Base):
     __tablename__ = "pcs"
     __table_args__ = (
         UniqueConstraint("club_id", "label"),
-        CheckConstraint("status IN ('active', 'maintenance', 'retired')", name="status_valid"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -80,8 +78,14 @@ class Pc(Base):
         uuid_fk_type, ForeignKey("zones.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     label: Mapped[str] = mapped_column(String(50), nullable=False)
-    specs: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default=PcStatus.ACTIVE)
+    name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="FREE")
+    current_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        uuid_fk_type, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    remaining_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    current_game: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    specs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = created_at_column()
 
     zone: Mapped[Zone] = relationship(lazy="raise")
