@@ -28,13 +28,19 @@ interface RuntimeConfig {
 
 function loadAppConfig(): RuntimeConfig {
   const candidatePaths = [
-    // 1. Next to the executable when packaged (e.g. C:\PCClubClient\config.json)
+    // 0. Directory where portable executable was launched from
+    ...(process.env.PORTABLE_EXECUTABLE_DIR
+      ? [path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'config.json')]
+      : []),
+    // 1. Electron userData directory
+    path.join(app.getPath('userData'), 'config.json'),
+    // 2. Next to the executable when packaged
     path.join(path.dirname(process.execPath), 'config.json'),
-    // 2. In electron extraResources folder
+    // 3. In electron extraResources folder
     path.join(process.resourcesPath, 'config.json'),
-    // 3. Current working directory
+    // 4. Current working directory
     path.join(process.cwd(), 'config.json'),
-    // 4. In desktop root (development)
+    // 5. In desktop root (development)
     path.join(__dirname, '../config.json'),
     path.join(__dirname, 'config.json'),
   ];
@@ -58,7 +64,17 @@ function loadAppConfig(): RuntimeConfig {
 
   const serverIp = String(rawConfig.serverIp || process.env.VITE_SERVER_IP || '127.0.0.1');
   const serverPort = Number(rawConfig.serverPort || process.env.VITE_SERVER_PORT || 8000);
-  const pcNumber = Number(rawConfig.pcId || process.env.VITE_PC_NUMBER || 1);
+
+  let pcNumber = 1;
+  if (rawConfig.pcNumber) {
+    pcNumber = Number(rawConfig.pcNumber) || 1;
+  } else if (typeof rawConfig.pcId === 'number') {
+    pcNumber = rawConfig.pcId;
+  } else if (typeof rawConfig.pcId === 'string') {
+    const digits = rawConfig.pcId.replace(/\D/g, '');
+    pcNumber = digits ? Number(digits) : 1;
+  }
+
   const pcId =
     typeof rawConfig.pcId === 'string' && rawConfig.pcId.startsWith('pc-')
       ? rawConfig.pcId
