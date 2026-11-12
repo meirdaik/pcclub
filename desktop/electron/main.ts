@@ -75,11 +75,20 @@ function loadAppConfig(): RuntimeConfig {
     pcNumber = digits ? Number(digits) : 1;
   }
 
-  const pcId =
-    typeof rawConfig.pcId === 'string' && rawConfig.pcId.startsWith('pc-')
-      ? rawConfig.pcId
-      : `pc-${String(pcNumber).padStart(3, '0')}`;
-  const pcLabel = String(rawConfig.pcLabel || `PC #${pcNumber}`);
+  // CLI argument override for multi-station local testing: --pc=1, --pc=2
+  for (const arg of process.argv) {
+    if (arg.startsWith('--pc=')) {
+      const num = Number(arg.split('=')[1]);
+      if (num) pcNumber = num;
+    } else if (arg.startsWith('--pc-id=')) {
+      const val = arg.split('=')[1];
+      const digits = val.replace(/\D/g, '');
+      if (digits) pcNumber = Number(digits);
+    }
+  }
+
+  const pcId = `pc-${String(pcNumber).padStart(3, '0')}`;
+  const pcLabel = rawConfig.pcLabel && pcNumber === 1 ? String(rawConfig.pcLabel) : `PC #${pcNumber}`;
   const authToken = String(rawConfig.authToken || process.env.VITE_PC_AUTH_TOKEN || 'dev-pc-token');
   const serverUrl = `http://${serverIp}:${serverPort}`;
   const wsUrl = `ws://${serverIp}:${serverPort}`;
@@ -403,14 +412,17 @@ function setMaintenanceMode(enabled: boolean): void {
 }
 
 function createWindow(): void {
+  const isWindowed = process.argv.includes('--windowed') || process.env.WINDOWED === 'true';
+
   mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
-    kiosk: true,
-    alwaysOnTop: true,
-    frame: false,
-    fullscreen: true,
+    width: isWindowed ? 1280 : 1920,
+    height: isWindowed ? 760 : 1080,
+    kiosk: !isWindowed,
+    alwaysOnTop: !isWindowed,
+    frame: isWindowed,
+    fullscreen: !isWindowed,
     backgroundColor: '#070913',
+    title: `PC Club Kiosk - ${appConfig.pcLabel}`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
