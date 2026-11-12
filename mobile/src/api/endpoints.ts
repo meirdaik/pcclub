@@ -10,6 +10,7 @@ export type User = Schemas['UserOut'];
 export type Club = Schemas['ClubOut'];
 export type Zone = Schemas['ZoneOut'];
 export type Pc = Schemas['PcOut'];
+export type Package = Schemas['PackageOut'];
 export type PcAvailability = Schemas['PcAvailabilityOut'];
 export type Booking = Schemas['BookingOut'];
 export type BookingPage = Schemas['BookingPage'];
@@ -46,6 +47,16 @@ export const listZones = (clubId: string) =>
 
 export const listPcs = (clubId: string) =>
   api<Pc[]>('GET', `/v1/clubs/${clubId}/pcs`, { auth: false });
+
+/**
+ * Fixed-price packages of a club (optionally of one zone). Book one by sending its id as
+ * `package_id`; `is_night` packages are 18+.
+ */
+export const listPackages = (clubId: string, zoneId?: string) =>
+  api<Package[]>('GET', `/v1/clubs/${clubId}/packages`, {
+    query: { zone_id: zoneId },
+    auth: false,
+  });
 
 /** Busy intervals of a PC for one club-local day (`YYYY-MM-DD`). */
 export const getPcAvailability = (pcId: string, date: string) =>

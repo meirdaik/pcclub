@@ -517,6 +517,71 @@
         }
       }
     },
+    "/v1/clubs/{club_id}/packages": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Packages",
+        "description": "Fixed-price packages of a club. Book one by sending its id as `package_id`.\n\n`is_night` marks packages whose window includes the restricted night hours (18+).",
+        "operationId": "list_packages_v1_clubs__club_id__packages_get",
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Club Id"
+            }
+          },
+          {
+            "name": "zone_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Zone Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PackageOut"
+                  },
+                  "title": "Response List Packages V1 Clubs  Club Id  Packages Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/pcs/{pc_id}/availability": {
       "get": {
         "tags": [
@@ -1872,16 +1937,34 @@
             "title": "Starts At"
           },
           "ends_at": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ends At"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
           }
         },
         "type": "object",
         "required": [
           "pc_id",
-          "starts_at",
-          "ends_at"
+          "starts_at"
         ],
         "title": "BookingCreate"
       },
@@ -1945,6 +2028,18 @@
             "type": "integer",
             "title": "Price Kzt"
           },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1974,6 +2069,7 @@
           "status",
           "hold_expires_at",
           "price_kzt",
+          "package_id",
           "created_at",
           "cancelled_at"
         ],
@@ -2332,6 +2428,99 @@
           "code"
         ],
         "title": "OtpVerify"
+      },
+      "PackageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "club_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Club Id"
+          },
+          "zone_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Zone Id"
+          },
+          "zone_name": {
+            "type": "string",
+            "title": "Zone Name"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "duration",
+              "window"
+            ],
+            "title": "Kind"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "price_kzt": {
+            "type": "integer",
+            "title": "Price Kzt"
+          },
+          "is_night": {
+            "type": "boolean",
+            "title": "Is Night"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "club_id",
+          "zone_id",
+          "zone_name",
+          "name",
+          "kind",
+          "duration_minutes",
+          "window_start",
+          "window_end",
+          "price_kzt",
+          "is_night"
+        ],
+        "title": "PackageOut"
       },
       "PaymentCreate": {
         "properties": {

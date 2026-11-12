@@ -62,7 +62,7 @@ mobile/src/
   api/               client.ts (bearer token, error envelope, single-flight refresh),
                      endpoints.ts (typed calls), schema.d.ts (generated), tokenStore.ts
   auth/              AuthContext: session state that drives the route guards in app/_layout.tsx
-  lib/               PURE helpers with tests: iin, phone, time (club timezone), slots
+  lib/               PURE helpers with tests: iin, phone, time (club timezone), slots, packages
   i18n/              ru.ts strings + error messages keyed by API error code
   ui/                theme and shared components
 ```

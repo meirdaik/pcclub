@@ -5,12 +5,14 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import {
   type Booking,
+  type Package,
   type Payment,
   type PaymentMethod,
   cancelBooking,
   createPayment,
   getBooking,
   getClub,
+  listPackages,
   listPcs,
   simulateMockPayment,
 } from '@/api/endpoints';
@@ -132,11 +134,20 @@ export default function BookingScreen() {
 
   const state = useLoad(async () => {
     const booking = await getBooking(bookingId);
-    const [club, pcs] = await Promise.all([
+    const [club, pcs, packages] = await Promise.all([
       getClub(booking.club_id),
       listPcs(booking.club_id).catch(() => []),
+      // Only to show the package's name; a package no longer on sale is simply not listed.
+      booking.package_id
+        ? listPackages(booking.club_id).catch((): Package[] => [])
+        : Promise.resolve<Package[]>([]),
     ]);
-    return { booking, club, pc: pcs.find((pc) => pc.id === booking.pc_id) ?? null };
+    return {
+      booking,
+      club,
+      pc: pcs.find((pc) => pc.id === booking.pc_id) ?? null,
+      packageName: packages.find((item) => item.id === booking.package_id)?.name ?? null,
+    };
   }, `booking:${bookingId}`);
 
   const booking = state.data?.booking ?? null;
@@ -171,7 +182,7 @@ export default function BookingScreen() {
   return (
     <Screen>
       <Loadable state={state}>
-        {({ booking: current, club, pc }) => {
+        {({ booking: current, club, pc, packageName }) => {
           const zone = club.timezone;
           const start = parseInstant(current.starts_at);
           const end = parseInstant(current.ends_at);
@@ -194,6 +205,9 @@ export default function BookingScreen() {
                   label={t.bookings.time}
                   value={`${formatInstantDay(start, zone)}, ${formatTime(start, zone)}–${formatTime(end, zone)}`}
                 />
+                {current.package_id ? (
+                  <Row label={t.bookings.tariff} value={packageName ?? t.bookings.package} />
+                ) : null}
                 <Row label={t.bookings.price} value={formatKzt(current.price_kzt)} />
               </Card>
 

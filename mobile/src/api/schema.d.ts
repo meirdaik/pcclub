@@ -190,6 +190,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/clubs/{club_id}/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Packages
+         * @description Fixed-price packages of a club. Book one by sending its id as `package_id`.
+         *
+         *     `is_night` marks packages whose window includes the restricted night hours (18+).
+         */
+        get: operations["list_packages_v1_clubs__club_id__packages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pcs/{pc_id}/availability": {
         parameters: {
             query?: never;
@@ -619,11 +641,10 @@ export interface components {
              * Format: date-time
              */
             starts_at: string;
-            /**
-             * Ends At
-             * Format: date-time
-             */
-            ends_at: string;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Package Id */
+            package_id?: string | null;
         };
         /** BookingOut */
         BookingOut: {
@@ -666,6 +687,8 @@ export interface components {
             hold_expires_at: string | null;
             /** Price Kzt */
             price_kzt: number;
+            /** Package Id */
+            package_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -787,6 +810,43 @@ export interface components {
              * @example 000000
              */
             code: string;
+        };
+        /** PackageOut */
+        PackageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Club Id
+             * Format: uuid
+             */
+            club_id: string;
+            /**
+             * Zone Id
+             * Format: uuid
+             */
+            zone_id: string;
+            /** Zone Name */
+            zone_name: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "duration" | "window";
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Price Kzt */
+            price_kzt: number;
+            /** Is Night */
+            is_night: boolean;
         };
         /** PaymentCreate */
         PaymentCreate: {
@@ -1332,6 +1392,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PcOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_packages_v1_clubs__club_id__packages_get: {
+        parameters: {
+            query?: {
+                zone_id?: string | null;
+            };
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageOut"][];
                 };
             };
             /** @description Validation Error */
