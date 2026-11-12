@@ -9,6 +9,7 @@ import AdminPanel from './screens/AdminPanel';
 function App() {
   const [appState, setAppState] = useState<AppState>('locked');
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [broadcastPopup, setBroadcastPopup] = useState<{ title: string; message: string } | null>(null);
 
   const handleLock = useCallback(async () => {
     console.log('[SENET] Session ended or locked -> Activating Kiosk Shield...');
@@ -86,6 +87,13 @@ function App() {
             window.electronAPI?.systemShutdown?.();
             break;
 
+          case 'BROADCAST_POPUP':
+            setBroadcastPopup({
+              title: (message.title as string) || 'CLUB BROADCAST',
+              message: (message.message as string) || 'Announcement from Club Operator',
+            });
+            break;
+
           case 'EXTEND':
             if (message.remaining_seconds !== undefined) {
               setSession((prev) =>
@@ -129,6 +137,74 @@ function App() {
 
       {appState === 'unlocked' && session && (
         <Dashboard session={session} onSessionEnd={handleLock} />
+      )}
+
+      {/* Instant Broadcast Popup Modal */}
+      {broadcastPopup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(5, 7, 18, 0.88)',
+          backdropFilter: 'blur(12px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999,
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #121829 0%, #0d1222 100%)',
+            border: '2px solid #00f0ff',
+            boxShadow: '0 0 50px rgba(0, 240, 255, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.1)',
+            borderRadius: '16px',
+            padding: '36px',
+            maxWidth: '560px',
+            width: '90%',
+            textAlign: 'center',
+            color: '#fff',
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📢</div>
+            <h2 style={{
+              margin: '0 0 12px 0',
+              fontFamily: 'monospace',
+              fontSize: '24px',
+              letterSpacing: '2px',
+              color: '#00f0ff',
+              textShadow: '0 0 10px rgba(0,240,255,0.6)',
+            }}>
+              {broadcastPopup.title}
+            </h2>
+            <p style={{
+              fontSize: '17px',
+              lineHeight: '1.6',
+              color: '#e2e8f0',
+              marginBottom: '28px',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {broadcastPopup.message}
+            </p>
+            <button
+              onClick={() => setBroadcastPopup(null)}
+              className="cyber-button"
+              style={{
+                background: 'linear-gradient(90deg, #00f0ff, #7928ca)',
+                border: 'none',
+                color: '#fff',
+                padding: '12px 32px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                letterSpacing: '1px',
+                boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)',
+              }}
+            >
+              ACKNOWLEDGE / OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

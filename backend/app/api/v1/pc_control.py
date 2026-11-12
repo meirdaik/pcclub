@@ -14,7 +14,7 @@ from app.api.deps import SessionDep, SettingsDep
 from app.api.v1.pc_ws import _resolve_pc
 from app.core.security import verify_password
 from app.models.club import Pc
-from app.models.kiosk import GamingSession, SessionStatus, SnackOrder, Tariff
+from app.models.kiosk import CashierShift, GamingSession, SessionStatus, SnackOrder, Tariff
 from app.models.user import User
 from app.services.pc_session import PcSessionManager, get_pc_session_manager
 
@@ -54,6 +54,46 @@ class OrderRequest(BaseModel):
 class CallAdminRequest(BaseModel):
     reason: str = "Assistance"
     message: str | None = None
+
+
+class PowerPlanRequest(BaseModel):
+    plan: str = Field(..., description="high_performance, balanced, or power_saver")
+
+
+class KillProcessRequest(BaseModel):
+    pid: int | None = None
+    name: str | None = None
+
+
+class LaunchAppRequest(BaseModel):
+    path: str
+
+
+class MaintenanceRequest(BaseModel):
+    enabled: bool = True
+
+
+class BroadcastRequest(BaseModel):
+    message: str
+    title: str = "Admin Notification"
+
+
+class WakeOnLanRequest(BaseModel):
+    mac_address: str
+
+
+class ChatSendRequest(BaseModel):
+    message: str
+    sender: str = "Admin"
+
+
+class OrderStatusUpdateRequest(BaseModel):
+    status: str = "DELIVERED"
+
+
+class ShiftCloseRequest(BaseModel):
+    cashier_name: str | None = None
+    notes: str | None = None
 
 
 class CommandResult(BaseModel):
@@ -106,6 +146,27 @@ async def unlock_pc(
         pc.session_status = "BUSY"
         pc.current_user_id = user.id
         pc.remaining_seconds = body.remaining_seconds
+
+        # Record revenue in active cashier shift
+        session_revenue = 0
+        if body.tariff_id:
+            try:
+                tariff = await session.get(Tariff, uuid.UUID(body.tariff_id))
+                if tariff:
+                    session_revenue = tariff.price_kzt
+            except Exception:
+                pass
+        if session_revenue == 0:
+            session_revenue = max(500, int((body.remaining_seconds / 3600) * 1000))
+
+        shift = await session.scalar(select(CashierShift).where(CashierShift.is_active == True).limit(1))  # noqa: E712
+        if not shift:
+            shift = CashierShift(cashier_name="Admin Cashier", is_active=True)
+            session.add(shift)
+            await session.flush()
+        shift.total_sessions += 1
+        shift.session_revenue_kzt += session_revenue
+        shift.total_revenue_kzt = shift.session_revenue_kzt + shift.order_revenue_kzt
         await session.commit()
 
     # 4. Push UNLOCK via WebSocket
@@ -264,8 +325,122 @@ async def place_station_order(
         session.add(snack)
         await session.commit()
 
+    # Also increment current cashier shift order revenue
+    shift = await session.scalar(select(CashierShift).where(CashierShift.is_active == True).limit(1))  # noqa: E712
+    if not shift:
+        shift = CashierShift(cashier_name="Admin Cashier", is_active=True)
+        session.add(shift)
+        await session.flush()
+    shift.total_orders += 1
+    shift.order_revenue_kzt += body.total_kzt
+    shift.total_revenue_kzt = shift.session_revenue_kzt + shift.order_revenue_kzt
+    await session.commit()
+
     logger.info("PC %s [SNACK ORDER]: %s (Total: %d₸)", pc_id, item_summary, body.total_kzt)
     return CommandResult(ok=True, detail=f"Order received for {pc_id}. Administrator dispatched.")
+
+
+@router.post("/{pc_id}/power-plan")
+async def set_pc_power_plan(
+    pc_id: str,
+    body: PowerPlanRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Remotely switch Windows power plan (high_performance, balanced, power_saver)."""
+    sent = await manager.send_command(pc_id, "SET_POWER_PLAN", {"plan": body.plan})
+    logger.info("PC %s: Power plan change to '%s' sent (dispatched=%s)", pc_id, body.plan, sent)
+    return CommandResult(ok=True, detail=f"Power plan '{body.plan}' sent to {pc_id}")
+
+
+@router.post("/{pc_id}/kill-process")
+async def kill_pc_process(
+    pc_id: str,
+    body: KillProcessRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Remotely terminate a running process by PID or image name on player's PC."""
+    sent = await manager.send_command(pc_id, "KILL_PROCESS", {"pid": body.pid, "name": body.name})
+    logger.info("PC %s: Kill process command sent (pid=%s, name=%s)", pc_id, body.pid, body.name)
+    return CommandResult(ok=True, detail=f"Kill process request sent to {pc_id}")
+
+
+@router.post("/{pc_id}/launch-app")
+async def remote_launch_app(
+    pc_id: str,
+    body: LaunchAppRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Remotely launch a game or application on player's PC."""
+    sent = await manager.send_command(pc_id, "LAUNCH_APP", {"path": body.path})
+    logger.info("PC %s: Remote launch app '%s' sent", pc_id, body.path)
+    return CommandResult(ok=True, detail=f"Launch app '{body.path}' sent to {pc_id}")
+
+
+@router.post("/{pc_id}/maintenance")
+async def toggle_maintenance_mode(
+    pc_id: str,
+    body: MaintenanceRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Toggle maintenance mode (exits kiosk fullscreen & unblocks desktop for technician)."""
+    sent = await manager.send_command(pc_id, "SET_MAINTENANCE", {"enabled": body.enabled})
+    logger.info("PC %s: Maintenance mode set to %s", pc_id, body.enabled)
+    return CommandResult(ok=True, detail=f"Maintenance mode set to {body.enabled} on {pc_id}")
+
+
+@router.post("/{pc_id}/wake-on-lan")
+async def wake_on_lan(
+    pc_id: str,
+    body: WakeOnLanRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send Wake-on-LAN magic packet to remotely power on offline PC."""
+    ok = manager.send_wake_on_lan(body.mac_address)
+    logger.info("Wake-on-LAN dispatched for %s (MAC: %s, result: %s)", pc_id, body.mac_address, ok)
+    return CommandResult(ok=ok, detail=f"Wake-on-LAN packet sent to MAC {body.mac_address}")
+
+
+@router.post("/{pc_id}/broadcast")
+async def broadcast_single_pc(
+    pc_id: str,
+    body: BroadcastRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send on-screen broadcast notification popup to a single PC."""
+    sent = await manager.send_command(pc_id, "BROADCAST_POPUP", {"message": body.message, "title": body.title})
+    return CommandResult(ok=True, detail=f"Broadcast message sent to {pc_id}")
+
+
+@router.post("/broadcast-all")
+async def broadcast_all_pcs(
+    body: BroadcastRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send on-screen broadcast notification popup to ALL club PCs."""
+    count = await manager.broadcast_command("BROADCAST_POPUP", {"message": body.message, "title": body.title})
+    logger.info("Broadcast popup dispatched to %d connected PCs: %s", count, body.message)
+    return CommandResult(ok=True, detail=f"Broadcast popup dispatched to {count} connected PCs")
+
+
+@router.post("/{pc_id}/chat")
+async def send_chat_message(
+    pc_id: str,
+    body: ChatSendRequest,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Send chat message from admin to station."""
+    msg = manager.add_chat_message(pc_id, body.sender, body.message)
+    await manager.send_command(pc_id, "CHAT_MESSAGE", msg)
+    return CommandResult(ok=True, detail="Message sent", data=msg)
+
+
+@router.get("/{pc_id}/chat")
+async def get_station_chat(
+    pc_id: str,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> list[dict[str, Any]]:
+    """Get chat message history for station."""
+    return manager.get_chat_messages(pc_id)
 
 
 # ------------------------------------------------------------------
@@ -343,6 +518,11 @@ async def list_admin_pcs(
                     "memory_usage": telemetry.get("memory_usage", 42 if computed_status == "BUSY" else 15),
                     "gpu_usage": telemetry.get("gpu_usage", 65 if computed_status == "BUSY" else 0),
                     "processes": telemetry.get("processes", [active_game] if active_game else []),
+                    "power_plan": telemetry.get(
+                        "power_plan", "High Performance" if computed_status == "BUSY" else "Balanced"
+                    ),
+                    "maintenance_mode": telemetry.get("maintenance_mode", False),
+                    "mac_address": telemetry.get("mac_address"),
                     "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
@@ -372,6 +552,9 @@ async def list_admin_pcs(
                     "memory_usage": telemetry.get("memory_usage", 45 if status == "BUSY" else 16),
                     "gpu_usage": telemetry.get("gpu_usage", 70 if status == "BUSY" else 0),
                     "processes": telemetry.get("processes", []),
+                    "power_plan": telemetry.get("power_plan", "High Performance" if status == "BUSY" else "Balanced"),
+                    "maintenance_mode": telemetry.get("maintenance_mode", False),
+                    "mac_address": telemetry.get("mac_address"),
                     "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
@@ -393,3 +576,117 @@ async def list_admin_tariffs(session: SessionDep) -> list[dict[str, Any]]:
         }
         for t in tariffs
     ]
+
+
+@admin_router.get("/chat")
+async def get_all_club_chat(
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> list[dict[str, Any]]:
+    """Get all recent chat messages across all club stations."""
+    return manager.get_chat_messages("ALL")
+
+
+@admin_router.get("/orders")
+async def list_snack_orders(
+    session: SessionDep,
+) -> list[dict[str, Any]]:
+    """List snack bar orders (newest first)."""
+    orders = (await session.scalars(select(SnackOrder).order_by(SnackOrder.created_at.desc()).limit(50))).all()
+    return [
+        {
+            "id": str(o.id),
+            "pc_id": o.pc_id,
+            "items": o.items,
+            "amount_kzt": o.amount_kzt,
+            "description": o.description,
+            "status": o.status,
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+        }
+        for o in orders
+    ]
+
+
+@admin_router.post("/orders/{order_id}/status")
+async def update_snack_order_status(
+    order_id: str,
+    body: OrderStatusUpdateRequest,
+    session: SessionDep,
+) -> CommandResult:
+    """Update status of a snack bar order (DELIVERED, CANCELLED, PENDING)."""
+    try:
+        o_uuid = uuid.UUID(order_id)
+        order = await session.get(SnackOrder, o_uuid)
+    except Exception:
+        order = None
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    order.status = body.status
+    await session.commit()
+    logger.info("Order %s updated to status: %s", order_id, body.status)
+    return CommandResult(ok=True, detail=f"Order status updated to {body.status}")
+
+
+@admin_router.get("/shift/current")
+async def get_current_shift(
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Get active cashier shift stats and financial summary."""
+    shift = await session.scalar(select(CashierShift).where(CashierShift.is_active == True).limit(1))  # noqa: E712
+    if not shift:
+        shift = CashierShift(cashier_name="Admin Cashier", is_active=True)
+        session.add(shift)
+        await session.commit()
+    return {
+        "id": str(shift.id),
+        "cashier_name": shift.cashier_name,
+        "opened_at": shift.opened_at.isoformat() if shift.opened_at else None,
+        "total_sessions": shift.total_sessions,
+        "session_revenue_kzt": shift.session_revenue_kzt,
+        "total_orders": shift.total_orders,
+        "order_revenue_kzt": shift.order_revenue_kzt,
+        "total_revenue_kzt": shift.total_revenue_kzt,
+        "is_active": shift.is_active,
+    }
+
+
+@admin_router.post("/shift/close")
+async def close_shift_and_generate_z_report(
+    body: ShiftCloseRequest,
+    session: SessionDep,
+) -> dict[str, Any]:
+    """Close active shift, generate official Z-Report, and open a new shift."""
+    shift = await session.scalar(select(CashierShift).where(CashierShift.is_active == True).limit(1))  # noqa: E712
+    if not shift:
+        shift = CashierShift(cashier_name=body.cashier_name or "Admin Cashier", is_active=True)
+        session.add(shift)
+        await session.flush()
+
+    shift.closed_at = datetime.now(UTC)
+    shift.is_active = False
+    if body.notes:
+        shift.notes = body.notes
+
+    z_report = {
+        "report_type": "Z-REPORT (DAILY SHIFT CLOSURE)",
+        "shift_id": str(shift.id),
+        "cashier_name": shift.cashier_name,
+        "opened_at": shift.opened_at.isoformat() if shift.opened_at else None,
+        "closed_at": shift.closed_at.isoformat(),
+        "total_sessions": shift.total_sessions,
+        "session_revenue_kzt": shift.session_revenue_kzt,
+        "total_orders": shift.total_orders,
+        "order_revenue_kzt": shift.order_revenue_kzt,
+        "total_revenue_kzt": shift.total_revenue_kzt,
+        "notes": shift.notes,
+    }
+
+    # Open fresh shift
+    new_shift = CashierShift(
+        cashier_name=body.cashier_name or shift.cashier_name,
+        is_active=True,
+    )
+    session.add(new_shift)
+    await session.commit()
+
+    logger.info("Cashier shift %s closed. Z-Report generated: Total %d₸", shift.id, shift.total_revenue_kzt)
+    return z_report

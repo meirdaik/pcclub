@@ -347,6 +347,18 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
   const warned300 = useRef(false);
   const warned60 = useRef(false);
 
+  // Live Chat with Admin
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; sender: string; text: string; timestamp: number }>>([
+    {
+      id: 'welcome',
+      sender: 'Club Admin',
+      text: `Hello ${session.username}! Need snacks, drinks, or assistance? Send us a message below.`,
+      timestamp: Date.now(),
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
   const playAlertTone = (freq = 750, count = 2) => {
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -411,6 +423,69 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
       window.electronAPI.getSystemStats().then(setSystemStats).catch(console.error);
     }
   }, []);
+
+  // Fetch station chat history & subscribe to incoming admin messages
+  useEffect(() => {
+    fetch(`${serverUrl}/api/pc/${pcId}/chat`)
+      .then((r) => r.json())
+      .then((msgs) => {
+        if (Array.isArray(msgs) && msgs.length > 0) {
+          setChatMessages((prev) => {
+            const ids = new Set(msgs.map((m: any) => m.id));
+            const uniquePrev = prev.filter((p) => !ids.has(p.id));
+            return [...uniquePrev, ...msgs];
+          });
+        }
+      })
+      .catch(() => {});
+
+    const unsub = socketService.onMessage((msg) => {
+      if (msg.action === 'CHAT_MESSAGE' || msg.type === 'chat_ack') {
+        const payload = (msg.message || msg) as any;
+        if (payload?.text) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: payload.id || `msg-${Date.now()}`,
+              sender: payload.sender || 'Club Admin',
+              text: payload.text,
+              timestamp: payload.timestamp || Date.now(),
+            },
+          ]);
+          playAlertTone(850, 1);
+        }
+      }
+    });
+    return unsub;
+  }, [serverUrl, pcId]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    const text = chatInput.trim();
+    setChatInput('');
+    const newMsg = {
+      id: `client-${Date.now()}`,
+      sender: session.username,
+      text,
+      timestamp: Date.now(),
+    };
+    setChatMessages((prev) => [...prev, newMsg]);
+
+    socketService.sendChatMessage(text, session.username);
+    try {
+      await fetch(`${serverUrl}/api/pc/${pcId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, sender: session.username }),
+      });
+    } catch {
+      // offline / ws fallback handled
+    }
+  };
 
   const formatTime = (totalSeconds: number): string => {
     const hrs = Math.floor(totalSeconds / 3600);
@@ -971,20 +1046,25 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
           </div>
         )}
 
-        {/* TAB 4: CALL ADMIN */}
+        {/* TAB 4: CALL & CHAT WITH ADMIN */}
         {activeTab === 'admin' && (
-          <div style={styles.adminPane}>
-            <div className="glass-panel" style={styles.adminCard}>
-              <h2 className="cyber-purple-text" style={styles.adminTitle}>
-                REQUEST OPERATOR ASSISTANCE
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', flex: 1, overflow: 'hidden' }}>
+            {/* Left: Quick Operator Dispatch */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+              <h2 className="cyber-purple-text" style={{ fontSize: '20px', letterSpacing: '1px', margin: '0 0 8px 0' }}>
+                🚨 REQUEST OPERATOR ASSISTANCE
               </h2>
-              <p style={styles.adminSubtitle}>
-                Select the issue category below. Club administrator will be notified instantly.
+              <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 16px 0' }}>
+                Click a preset reason below to trigger an urgent cashier desk alert.
               </p>
 
-              {adminFeedback && <div style={styles.adminSuccessToast}>{adminFeedback}</div>}
+              {adminFeedback && (
+                <div style={{ background: 'rgba(0, 240, 255, 0.15)', border: '1px solid #00f0ff', color: '#00f0ff', padding: '10px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
+                  {adminFeedback}
+                </div>
+              )}
 
-              <div style={styles.reasonButtons}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                 {[
                   'Hardware / Peripherals Issue',
                   'Game Needs Update / Download',
@@ -996,31 +1076,103 @@ export default function Dashboard({ session, onSessionEnd }: DashboardProps) {
                     key={reason}
                     onClick={() => setAdminReason(reason)}
                     className={`cyber-button ${adminReason === reason ? '' : 'secondary'}`}
-                    style={styles.reasonBtn}
+                    style={{ textAlign: 'left', padding: '10px 14px', fontSize: '13px' }}
                   >
                     {reason}
                   </button>
                 ))}
               </div>
 
-              <div style={styles.inputGroup}>
-                <label style={styles.fieldLabel}>ADDITIONAL NOTE / SEAT DETAILS</label>
+              <div style={{ marginTop: 'auto' }}>
                 <input
                   type="text"
                   className="cyber-input"
-                  placeholder="Optional details (e.g. mouse right click double clicking)"
+                  placeholder="Optional details (e.g. mouse right click issue)"
                   value={adminMessage}
                   onChange={(e) => setAdminMessage(e.target.value)}
+                  style={{ width: '100%', marginBottom: '12px', boxSizing: 'border-box' }}
                 />
+                <button
+                  onClick={handleSendAdminCall}
+                  className="cyber-button secondary"
+                  style={{ width: '100%', padding: '12px' }}
+                >
+                  DISPATCH OPERATOR NOW
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Live 2-Way Chat with Club Admin */}
+            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h2 style={{ fontSize: '18px', color: '#00f0ff', margin: 0, fontFamily: 'monospace', letterSpacing: '1px' }}>
+                  💬 LIVE CHAT WITH ADMIN
+                </h2>
+                <span style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                  Cashier Online
+                </span>
               </div>
 
-              <button
-                onClick={handleSendAdminCall}
-                className="cyber-button secondary"
-                style={styles.sendCallBtn}
-              >
-                DISPATCH OPERATOR NOW
-              </button>
+              {/* Chat Message List */}
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                background: 'rgba(5, 7, 18, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                marginBottom: '12px',
+                maxHeight: '400px',
+              }}>
+                {chatMessages.map((m) => {
+                  const isMe = m.sender === session.username;
+                  return (
+                    <div
+                      key={m.id}
+                      style={{
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        maxWidth: '82%',
+                        background: isMe ? 'linear-gradient(135deg, #00f0ff22, #7928ca44)' : 'rgba(255, 255, 255, 0.06)',
+                        border: isMe ? '1px solid #00f0ff88' : '1px solid rgba(255, 255, 255, 0.15)',
+                        borderRadius: '10px',
+                        padding: '8px 12px',
+                      }}
+                    >
+                      <div style={{ fontSize: '11px', color: isMe ? '#00f0ff' : '#a855f7', fontWeight: 'bold', marginBottom: '4px' }}>
+                        {isMe ? 'You' : m.sender}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#e2e8f0', wordBreak: 'break-word' }}>
+                        {m.text}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Chat Input */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  type="text"
+                  className="cyber-input"
+                  placeholder="Type a message to the cashier (Enter to send)..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  onClick={handleSendChat}
+                  className="cyber-button"
+                  style={{ padding: '0 20px' }}
+                >
+                  SEND
+                </button>
+              </div>
             </div>
           </div>
         )}

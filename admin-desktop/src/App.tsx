@@ -7,10 +7,14 @@ import PcCard from './components/PcCard';
 import PcControlModal from './components/PcControlModal';
 import AlertsDrawer from './components/AlertsDrawer';
 import SettingsModal from './components/SettingsModal';
+import ShiftModal from './components/ShiftModal';
+import OrdersDrawer from './components/OrdersDrawer';
+import BroadcastModal from './components/BroadcastModal';
 
 export default function App() {
   const [pcs, setPcs] = useState<ClubPc[]>([]);
   const [tariffs, setTariffs] = useState<Tariff[]>([]);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -23,6 +27,9 @@ export default function App() {
   const [selectedPc, setSelectedPc] = useState<ClubPc | null>(null);
   const [isAlertsOpen, setIsAlertsOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isShiftOpen, setIsShiftOpen] = useState<boolean>(false);
+  const [isOrdersOpen, setIsOrdersOpen] = useState<boolean>(false);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState<boolean>(false);
 
   // Audio tone for alerts
   const lastAlertCount = useRef<number>(0);
@@ -49,12 +56,17 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     try {
-      const [pcList, tariffList] = await Promise.all([
+      const [pcList, tariffList, ordersList] = await Promise.all([
         api.fetchPcs(),
         api.fetchTariffs().catch(() => []),
+        api.fetchOrders().catch(() => []),
       ]);
       setPcs(pcList);
       if (tariffList.length > 0) setTariffs(tariffList);
+      if (Array.isArray(ordersList)) {
+        const pending = ordersList.filter((o: any) => o.status === 'PENDING').length;
+        setPendingOrdersCount(pending);
+      }
       setIsConnected(true);
 
       // Check if new alert arrived to ring chime
@@ -189,7 +201,11 @@ export default function App() {
         onRefresh={loadData}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAlerts={() => setIsAlertsOpen(true)}
+        onOpenBroadcast={() => setIsBroadcastOpen(true)}
+        onOpenOrders={() => setIsOrdersOpen(true)}
+        onOpenShift={() => setIsShiftOpen(true)}
         alertCount={alertPcs.length}
+        pendingOrdersCount={pendingOrdersCount}
         filterZone={filterZone}
         setFilterZone={setFilterZone}
         filterStatus={filterStatus}
@@ -271,6 +287,30 @@ export default function App() {
           onSaved={() => {
             loadData();
           }}
+        />
+      )}
+
+      {/* Cashier Shift (Z-Report) Modal */}
+      {isShiftOpen && (
+        <ShiftModal
+          onClose={() => setIsShiftOpen(false)}
+          onShiftUpdated={loadData}
+        />
+      )}
+
+      {/* Snack Bar Orders Drawer */}
+      {isOrdersOpen && (
+        <OrdersDrawer
+          onClose={() => setIsOrdersOpen(false)}
+          onOrderUpdated={loadData}
+        />
+      )}
+
+      {/* Broadcast Notification Modal */}
+      {isBroadcastOpen && (
+        <BroadcastModal
+          pcs={pcs}
+          onClose={() => setIsBroadcastOpen(false)}
         />
       )}
     </div>

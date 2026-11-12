@@ -341,7 +341,7 @@ export default function PcControlModal({
                 {pc.processes && pc.processes.length > 0 ? (
                   pc.processes.map((p, idx) => (
                     <div key={idx} style={styles.processItem}>
-                      <span>⚡ {p}</span>
+                      <span>⚡ {typeof p === 'string' ? p : p.name}</span>
                       <span style={styles.runningBadge}>RUNNING</span>
                     </div>
                   ))

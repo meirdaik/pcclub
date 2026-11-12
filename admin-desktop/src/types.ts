@@ -8,6 +8,12 @@ export interface PcHardwareSpecs {
   monitor?: string;
 }
 
+export interface ProcessItem {
+  name: string;
+  pid?: number;
+  memoryMb?: number;
+}
+
 export interface ClubPc {
   id: string;
   pc_id: string;
@@ -24,8 +30,43 @@ export interface ClubPc {
   cpu_usage?: number;
   memory_usage?: number;
   gpu_usage?: number;
-  processes?: string[];
+  processes?: Array<ProcessItem | string>;
+  power_plan?: string;
+  maintenance_mode?: boolean;
+  mac_address?: string;
   last_heartbeat?: number;
+}
+
+export interface SnackOrder {
+  id: string;
+  pc_id: string;
+  items: Array<{ name: string; quantity: number; price_kzt: number }>;
+  amount_kzt: number;
+  description: string;
+  status: 'PENDING' | 'DELIVERED' | 'CANCELLED';
+  created_at: string;
+}
+
+export interface CashierShift {
+  id: string;
+  cashier_name: string;
+  opened_at: string;
+  closed_at?: string | null;
+  total_sessions: number;
+  session_revenue_kzt: number;
+  total_orders: number;
+  order_revenue_kzt: number;
+  total_revenue_kzt: number;
+  is_active: boolean;
+  notes?: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  pc_id: string;
+  sender: string;
+  text: string;
+  timestamp: number;
 }
 
 export interface Tariff {
