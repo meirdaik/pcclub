@@ -131,6 +131,22 @@ function App() {
       });
     });
 
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      const isCtrlShift = (e.ctrlKey || e.metaKey) && e.shiftKey;
+      const isKeyA = e.code === 'KeyA' || e.key === 'a' || e.key === 'A' || e.key === 'ф' || e.key === 'Ф';
+      const isKeyQ = e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q' || e.key === 'й' || e.key === 'Й';
+      const isKeyS = e.code === 'KeyS' || e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы';
+
+      if (isCtrlShift && (isKeyA || isKeyQ)) {
+        e.preventDefault();
+        setIsAdminPinModalOpen((prev) => !prev);
+      } else if (isCtrlShift && isKeyS) {
+        e.preventDefault();
+        setIsSetupModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+
     const unregPin = window.electronAPI?.onOpenAdminPinModal?.(() => {
       setIsAdminPinModalOpen(true);
     });
@@ -148,6 +164,7 @@ function App() {
     });
 
     return () => {
+      window.removeEventListener('keydown', handleGlobalShortcuts);
       unsubscribe();
       unregPin?.();
       unregSetup?.();
@@ -162,6 +179,7 @@ function App() {
         <LockScreen
           onUnlock={handleUnlock}
           onOpenAdmin={() => setAppState('admin')}
+          onOpenAdminPin={() => setIsAdminPinModalOpen(true)}
         />
       )}
 

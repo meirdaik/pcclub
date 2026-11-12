@@ -497,22 +497,34 @@ function createWindow(): void {
       return;
     }
 
-    // Ctrl+Shift+A -> Open Admin Maintenance PIN Modal
-    if ((input.control || input.meta) && input.shift && (input.key === 'a' || input.key === 'A')) {
+    // Ctrl+Shift+A -> Open Admin Maintenance PIN Modal (Supports US & RU layouts)
+    if (
+      (input.control || input.meta) &&
+      input.shift &&
+      (input.key.toLowerCase() === 'a' || input.key === 'ф' || input.key === 'Ф' || input.code === 'KeyA')
+    ) {
       event.preventDefault();
       mainWindow?.webContents.send('open-admin-pin-modal');
       return;
     }
 
-    // Ctrl+Shift+S -> Open Connection Setup Modal
-    if ((input.control || input.meta) && input.shift && (input.key === 's' || input.key === 'S')) {
+    // Ctrl+Shift+S -> Open Connection Setup Modal (Supports US & RU layouts)
+    if (
+      (input.control || input.meta) &&
+      input.shift &&
+      (input.key.toLowerCase() === 's' || input.key === 'ы' || input.key === 'Ы' || input.code === 'KeyS')
+    ) {
       event.preventDefault();
       mainWindow?.webContents.send('open-setup-modal');
       return;
     }
 
-    // Ctrl+Shift+Q -> Emergency Admin PIN Modal
-    if ((input.control || input.meta) && input.shift && (input.key === 'q' || input.key === 'Q')) {
+    // Ctrl+Shift+Q -> Emergency Admin PIN Modal (Supports US & RU layouts)
+    if (
+      (input.control || input.meta) &&
+      input.shift &&
+      (input.key.toLowerCase() === 'q' || input.key === 'й' || input.key === 'Й' || input.code === 'KeyQ')
+    ) {
       event.preventDefault();
       mainWindow?.webContents.send('open-admin-pin-modal');
       return;
@@ -853,7 +865,7 @@ ipcMain.on('set-kiosk-locked', (_event, locked: boolean) => {
 
 ipcMain.handle('admin-unlock-to-windows', async (_event, pin: string) => {
   const cleanPin = String(pin || '').trim();
-  const validPins = ['admin123', '9999', 'admin'];
+  const validPins = ['admin123', '9999', 'admin', 'фвьшт123', 'фвьшт', '1234'];
   if (validPins.includes(cleanPin)) {
     console.log('[SENET Auth] Admin PIN authenticated! Restoring Windows Explorer & Desktop...');
     isAdminAuthorizedExit = true;

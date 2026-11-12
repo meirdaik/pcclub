@@ -11,6 +11,7 @@ import ParallaxBackground from '../components/ParallaxBackground';
 interface LockScreenProps {
   onUnlock?: (session: SessionInfo) => void;
   onOpenAdmin?: () => void;
+  onOpenAdminPin?: () => void;
 }
 
 interface TariffPill {
@@ -28,7 +29,7 @@ const TARIFFS: TariffPill[] = [
   { id: 'night', name: 'ALL-NIGHT VIP', price: '5,500₸', durationSec: 28800, badge: 'BEST VALUE' },
 ];
 
-export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
+export default function LockScreen({ onUnlock, onOpenAdmin, onOpenAdminPin }: LockScreenProps) {
   const [config, setConfig] = useState(getAppConfig());
   const pcLabel = config.pcLabel || 'PC #1';
   const pcId = config.pcId || 'pc-001';
@@ -235,6 +236,21 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
           </div>
 
           <div style={styles.headerRightControls}>
+            {onOpenAdminPin && (
+              <button
+                onClick={onOpenAdminPin}
+                className="cyber-button secondary"
+                style={{
+                  ...styles.headerBtn,
+                  borderColor: '#ff0055',
+                  color: '#ff4d88',
+                  backgroundColor: 'rgba(255, 0, 85, 0.15)',
+                }}
+                title="Technician Windows Unlock & Explorer Restore (Ctrl+Shift+A)"
+              >
+                <Lock size={13} style={{ marginRight: 6 }} /> ADMIN UNLOCK
+              </button>
+            )}
             <button
               onClick={() => setIsSetupOpen(true)}
               className="cyber-button secondary"
@@ -476,7 +492,11 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
               <Wifi size={14} color={isWsConnected ? '#00ff88' : '#ff0055'} />
               <span>SERVER LAN: <b>{serverUrl.replace(/^https?:\/\//, '')}</b></span>
             </div>
-            <div style={styles.hotkeyTag}>
+            <div
+              style={{ ...styles.hotkeyTag, cursor: 'pointer' }}
+              onClick={onOpenAdminPin}
+              title="Click or press Ctrl+Shift+A to unlock Windows desktop"
+            >
               <Lock size={12} style={{ marginRight: 4 }} />
               ADMIN: <kbd style={styles.kbd}>Ctrl+Shift+A</kbd>
             </div>
