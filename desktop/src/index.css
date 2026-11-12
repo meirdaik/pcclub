@@ -147,6 +147,11 @@ body, html {
 }
 
 /* Cyber Input */
+input, textarea, .cyber-input {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 .cyber-input {
   background: rgba(10, 15, 30, 0.85);
   border: 1px solid var(--border-subtle);

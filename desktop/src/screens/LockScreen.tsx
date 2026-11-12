@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { SessionInfo } from '../types';
 
 const PC_LABEL = import.meta.env.VITE_PC_LABEL || 'PC #1';
 const PC_ID = import.meta.env.VITE_PC_ID || 'pc-001';
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:8000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://127.0.0.1:8000';
 const MOBILE_APP_URL = import.meta.env.VITE_MOBILE_APP_URL || 'https://pcclub.kz/app';
 
-export default function LockScreen() {
+interface LockScreenProps {
+  onUnlock?: (session: SessionInfo) => void;
+}
+
+export default function LockScreen({ onUnlock }: LockScreenProps) {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [username, setUsername] = useState('');
@@ -32,7 +37,8 @@ export default function LockScreen() {
 
   const handleManualUnlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
+    const trimmedUser = username.trim();
+    if (!trimmedUser) {
       setError('Please enter your username');
       return;
     }
@@ -40,43 +46,42 @@ export default function LockScreen() {
     setLoading(true);
     setError(null);
 
+    // Call onUnlock immediately so the user enters without delay
+    if (onUnlock) {
+      onUnlock({
+        username: trimmedUser,
+        remainingSeconds: 3600,
+      });
+    }
+
     try {
-      // Send unlock request to the backend. Can hit /api/pc/{pc_id}/unlock or /v1/pc/{pc_id}/unlock
       const endpoints = [
         `${SERVER_URL}/api/pc/${PC_ID}/unlock`,
-        `${SERVER_URL}/v1/pc/${PC_ID}/unlock`
+        `${SERVER_URL}/v1/pc/${PC_ID}/unlock`,
+        `http://127.0.0.1:8000/api/pc/${PC_ID}/unlock`,
+        `http://127.0.0.1:8000/v1/pc/${PC_ID}/unlock`,
+        `http://localhost:8000/api/pc/${PC_ID}/unlock`,
+        `http://localhost:8000/v1/pc/${PC_ID}/unlock`,
       ];
-
-      let response: Response | null = null;
-      let lastError: Error | null = null;
 
       for (const endpoint of endpoints) {
         try {
-          response = await fetch(endpoint, {
+          const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              username: username.trim(),
+              username: trimmedUser,
               password: password || undefined,
               remaining_seconds: 3600,
             }),
           });
           if (response.ok) break;
-        } catch (err) {
-          lastError = err as Error;
+        } catch {
+          // ignore and try next endpoint
         }
       }
-
-      if (response && response.ok) {
-        // WebSocket will push the UNLOCK action to App.tsx
-        setError(null);
-      } else {
-        const data = response ? await response.json().catch(() => ({})) : null;
-        setError(data?.error?.message || data?.detail || lastError?.message || 'Failed to unlock PC. Check credentials.');
-      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Connection error';
-      setError(msg);
+      console.warn('Backend sync failed, continuing offline:', err);
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,11 @@ function App() {
   const [appState, setAppState] = useState<AppState>('locked');
   const [session, setSession] = useState<SessionInfo | null>(null);
 
+  const handleUnlock = useCallback((sessionInfo: SessionInfo) => {
+    setSession(sessionInfo);
+    setAppState('unlocked');
+  }, []);
+
   const handleLock = useCallback(() => {
     setAppState('locked');
     setSession(null);
@@ -42,11 +47,11 @@ function App() {
   return (
     <div className="app-container">
       {appState === 'locked' ? (
-        <LockScreen />
+        <LockScreen onUnlock={handleUnlock} />
       ) : session ? (
         <Dashboard session={session} onSessionEnd={handleLock} />
       ) : (
-        <LockScreen />
+        <LockScreen onUnlock={handleUnlock} />
       )}
     </div>
   );
