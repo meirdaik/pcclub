@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     iin_encryption_key: str = ""  # Fernet key; empty = derived dev key
     mock_payment_webhook_secret: str = _DEV_SECRET
 
+    # --- PC kiosk WebSocket ---
+    pc_auth_token: str = "dev-pc-token"
+
     # --- auth ---
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 30

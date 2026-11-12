@@ -24,8 +24,25 @@ from app.integrations.payments.base import (
 )
 from app.integrations.registry import PaymentProviders
 from app.models import Booking, BookingStatus, Payment, PaymentStatus, User
+from app.services.pc_session import pc_session_manager
 
 logger = logging.getLogger("pcclub.payments")
+
+
+async def _auto_unlock_pc(booking: Booking) -> None:
+    """Best-effort UNLOCK when a booking is confirmed via webhook."""
+    pc_id = str(booking.pc_id)
+    remaining = int((booking.ends_at - booking.starts_at).total_seconds())
+    username = f"Player #{str(booking.user_id)[:6]}"
+    sent = await pc_session_manager.send_command(
+        pc_id,
+        "UNLOCK",
+        {"username": username, "remaining_seconds": remaining},
+    )
+    if sent:
+        logger.info("Auto-unlocked PC %s for booking %s", pc_id, booking.id)
+    else:
+        logger.debug("PC %s not connected; skipping auto-unlock for booking %s", pc_id, booking.id)
 
 
 async def create_payment(
@@ -170,6 +187,8 @@ async def apply_event(
     hold_is_live = booking.status == BookingStatus.PENDING_PAYMENT and booking.hold_expires_at > now
     if hold_is_live:
         booking.status = BookingStatus.CONFIRMED
+        # Auto-unlock the PC if it is connected via WebSocket.
+        await _auto_unlock_pc(booking)
     else:
         # Paid too late, or the booking was already paid/cancelled: give the money back.
         if booking.status == BookingStatus.PENDING_PAYMENT:

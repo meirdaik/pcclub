@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, bookings, clubs, me, payments
+from app.api.v1 import auth, bookings, clubs, me, payments, pc_control, pc_ws
 from app.api.v1.admin import auth as admin_auth
 from app.api.v1.admin import clubs as admin_clubs
 from app.core.config import Settings, get_settings
@@ -50,7 +50,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.uses_mock_payments and settings.environment != "prod":
         v1.include_router(payments.mock_router)
     v1.include_router(payments.router)
+    v1.include_router(pc_control.router)
     app.include_router(v1)
+
+    # Also alias /api/pc for direct integration calls (e.g. /api/pc/{pc_id}/unlock)
+    api_router = APIRouter(prefix="/api")
+    api_router.include_router(pc_control.router)
+    app.include_router(api_router)
+
+    # WebSocket routes are mounted directly on the app (not behind /v1 prefix).
+    app.include_router(pc_ws.router)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
