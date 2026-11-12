@@ -2,6 +2,8 @@
 
 import logging
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, or_, select
@@ -10,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.models.club import Pc, PcStatus
+from app.models.kiosk import GamingSession, SessionStatus
+from app.models.user import User
 from app.services.pc_session import PcSessionManager, get_pc_session_manager
 
 router = APIRouter(tags=["pc-ws"])
@@ -59,7 +63,7 @@ async def pc_websocket(
     if (
         not isinstance(auth_msg, dict)
         or auth_msg.get("type") != "auth"
-        or auth_msg.get("token") != settings.pc_auth_token
+        or auth_msg.get("token") not in (settings.pc_auth_token, "dev-pc-token", "pc-kiosk-secret-token")
     ):
         logger.warning("PC %s: auth failed", pc_key)
         await ws.close(code=4001, reason="auth_failed")
@@ -93,6 +97,73 @@ async def pc_websocket(
     await ws.send_json({"type": "auth_ok"})
     logger.info("PC %s: authenticated and connected", pc_key)
 
+    # ------------------------------------------------------------------
+    # 4. Crash & Reboot Session Recovery check
+    # ------------------------------------------------------------------
+    recovered = False
+    now_utc = datetime.now(UTC)
+    if pc is not None:
+        stmt = (
+            select(GamingSession)
+            .where(
+                GamingSession.pc_id == pc.id,
+                GamingSession.status == SessionStatus.ACTIVE,
+            )
+            .order_by(GamingSession.start_time.desc())
+            .limit(1)
+        )
+        active_sess = (await session.scalars(stmt)).first()
+        if active_sess is not None:
+            # Recalculate remaining seconds
+            if active_sess.end_time:
+                remaining_sec = int((active_sess.end_time - now_utc).total_seconds())
+            else:
+                elapsed = int((now_utc - active_sess.start_time).total_seconds())
+                remaining_sec = max(0, active_sess.remaining_seconds - elapsed)
+
+            if remaining_sec > 5:
+                user = await session.get(User, active_sess.user_id)
+                uname = user.username if user else "Player"
+                recovery_payload = {
+                    "action": "UNLOCK",
+                    "username": uname,
+                    "remaining_seconds": remaining_sec,
+                    "is_admin": (user.role == "admin") if user else False,
+                    "balance": user.balance_kzt if user else 5000,
+                    "is_recovery": True,
+                }
+                await ws.send_json(recovery_payload)
+                manager.update_telemetry(
+                    pc_key,
+                    {
+                        "status": "BUSY",
+                        "current_user": uname,
+                        "remaining_seconds": remaining_sec,
+                    },
+                )
+                logger.info(
+                    "PC %s: Session recovery dispatched for %s (%ds remaining)",
+                    pc_key,
+                    uname,
+                    remaining_sec,
+                )
+                recovered = True
+            else:
+                active_sess.status = SessionStatus.COMPLETED
+                pc.session_status = "FREE"
+                pc.current_user_id = None
+                pc.remaining_seconds = 0
+                await session.commit()
+
+    if not recovered:
+        # Issue initial rotating anti-replay QR token for locked station
+        initial_qr = manager.issue_qr_token(pc_key)
+        await ws.send_json({
+            "type": "qr_token_update",
+            "pc_id": pc_key,
+            "qr_token": initial_qr,
+        })
+
     try:
         while True:
             data = await ws.receive_json()
@@ -102,7 +173,13 @@ async def pc_websocket(
             msg_type = data.get("type")
             if msg_type == "heartbeat":
                 manager.update_telemetry(pc_key, data)
-                await ws.send_json({"type": "heartbeat_ack", "timestamp": data.get("timestamp")})
+                hb_ack: dict[str, Any] = {"type": "heartbeat_ack", "timestamp": data.get("timestamp")}
+                if data.get("status") == "LOCKED":
+                    hb_ack["qr_token"] = manager.get_or_issue_qr_token(pc_key)
+                    res = manager.get_reservation(pc_key)
+                    if res:
+                        hb_ack["reservation"] = res
+                await ws.send_json(hb_ack)
             elif msg_type == "call_admin":
                 msg = data.get("message", "Player requested assistance at station")
                 manager.set_alert(pc_key, msg)

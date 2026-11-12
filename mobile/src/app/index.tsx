@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { listClubs } from '@/api/endpoints';
+import { listClubs, qrUnlockPc } from '@/api/endpoints';
 import { useAuth, useUser } from '@/auth/AuthContext';
 import { openingHoursLabel, t } from '@/i18n';
 import { useLoad } from '@/lib/useLoad';
@@ -18,8 +18,33 @@ export default function ClubsScreen() {
 
   const isRefreshing = clubs.loading && clubs.data !== null;
 
+  const handleQuickQrUnlock = async () => {
+    Alert.prompt?.(
+      'Scan or Enter QR Token',
+      'Enter the Station ID and dynamic token shown on the kiosk screen (format: pc-001:token):',
+      async (text) => {
+        if (!text) return;
+        const [pcId, token] = text.includes(':') ? text.split(':') : ['pc-001', text];
+        try {
+          const res = await qrUnlockPc({
+            pc_id: pcId.trim(),
+            qr_token: (token || text).trim(),
+            username: user.phone,
+          });
+          Alert.alert('Station Unlocked!', res.detail || 'Your session has started on screen.');
+        } catch (err: any) {
+          Alert.alert('Unlock Failed', err.message || 'Invalid or expired QR token.');
+        }
+      },
+    );
+  };
+
   return (
     <Screen refreshing={isRefreshing} onRefresh={clubs.reload}>
+      <Card onPress={handleQuickQrUnlock}>
+        <Text style={[font.heading, { color: colors.primary }]}>📷 QR Unlock Station</Text>
+        <Text style={font.small}>Scan or enter dynamic kiosk code to start session immediately</Text>
+      </Card>
       <Button
         title={t.clubs.myBookings}
         variant="secondary"

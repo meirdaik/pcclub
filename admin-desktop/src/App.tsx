@@ -169,6 +169,12 @@ export default function App() {
     loadData();
   };
 
+  const handleModalTransfer = async (fromPc: ClubPc, toPcId: string) => {
+    const res = await api.transferPcSession(fromPc.pc_id, toPcId);
+    if (!res.ok) throw new Error(res.detail || 'Session transfer failed');
+    loadData();
+  };
+
   // Filter logic
   const filteredPcs = pcs.filter((pc) => {
     // Zone filter
@@ -258,12 +264,14 @@ export default function App() {
         <PcControlModal
           pc={selectedPc}
           tariffs={tariffs}
+          allPcs={pcs}
           onClose={() => setSelectedPc(null)}
           onUnlock={handleModalUnlock}
           onLock={handleModalLock}
           onExtend={handleModalExtend}
           onReboot={handleModalReboot}
           onShutdown={handleModalShutdown}
+          onTransfer={handleModalTransfer}
         />
       )}
 

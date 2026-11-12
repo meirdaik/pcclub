@@ -1,4 +1,4 @@
-export type PcStatus = 'FREE' | 'BUSY' | 'ALERT' | 'OFFLINE';
+export type PcStatus = 'FREE' | 'BUSY' | 'ALERT' | 'OFFLINE' | 'RESERVED';
 
 export interface PcHardwareSpecs {
   cpu?: string;
@@ -45,6 +45,7 @@ export interface ClubPc {
   maintenance_mode?: boolean;
   mac_address?: string;
   security?: BiosSecurityInfo;
+  reservation?: { user: string; starts_at: string; ends_at: string };
   last_heartbeat?: number;
 }
 

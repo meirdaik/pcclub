@@ -5,7 +5,6 @@ import { getAppConfig, initAppConfig } from '../services/config';
 import { socketService } from '../services/socket';
 import ConnectionSetupModal from '../components/ConnectionSetupModal';
 
-const MOBILE_APP_URL = import.meta.env.VITE_MOBILE_APP_URL || 'https://pcclub.kz/app';
 
 interface LockScreenProps {
   onUnlock?: (session: SessionInfo) => void;
@@ -25,11 +24,48 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
   const [loading, setLoading] = useState(false);
   const [isSetupOpen, setIsSetupOpen] = useState(false);
   const [isWsConnected, setIsWsConnected] = useState(socketService.isConnected());
+  const [qrToken, setQrToken] = useState<string>('init-token');
+  const [reservation, setReservation] = useState<{
+    isReserved: boolean;
+    reservedFor?: string;
+    reservedUntil?: string;
+  } | null>(null);
 
   useEffect(() => {
     initAppConfig().then((cfg) => {
       setConfig(cfg);
     });
+
+    const unsubscribe = socketService.onMessage((msg: any) => {
+      // Rotating QR token update
+      if (msg.qr_token) {
+        setQrToken(msg.qr_token);
+      }
+      if (msg.type === 'qr_token_update' && msg.token) {
+        setQrToken(msg.token);
+      }
+
+      // Reservation update from upcoming bookings
+      if (msg.reservation) {
+        setReservation({
+          isReserved: true,
+          reservedFor: msg.reservation.user,
+          reservedUntil: msg.reservation.starts_at || msg.reservation.ends_at,
+        });
+      } else if (msg.type === 'reservation_update') {
+        if (msg.is_reserved) {
+          setReservation({
+            isReserved: true,
+            reservedFor: msg.reserved_for,
+            reservedUntil: msg.starts_at || msg.ends_at,
+          });
+        } else {
+          setReservation(null);
+        }
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -69,10 +105,19 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
       return;
     }
 
+    const isAdmin = trimmedUser.toLowerCase() === 'admin';
+
+    // Enforce booking hold state
+    if (reservation?.isReserved && reservation.reservedFor) {
+      if (trimmedUser.toLowerCase() !== reservation.reservedFor.toLowerCase() && !isAdmin) {
+        setError(`This station is reserved for @${reservation.reservedFor}. Only @${reservation.reservedFor} or Admin can log in.`);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
-    const isAdmin = trimmedUser.toLowerCase() === 'admin';
     let authSucceeded = false;
     let authData: any = null;
 
@@ -180,15 +225,31 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
       <main style={styles.mainContent}>
         {/* Left Side: PC Label & QR Code for Mobile */}
         <div className="glass-panel" style={styles.qrCard}>
-          <div style={styles.kioskTitleBadge}>STATION LOCKED</div>
+          {reservation?.isReserved ? (
+            <div style={styles.reservedBanner}>
+              <div style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '1px' }}>🔒 RESERVED STATION</div>
+              <div style={{ fontSize: '18px', fontWeight: 900, color: '#ffea00', margin: '4px 0' }}>
+                FOR @{reservation.reservedFor?.toUpperCase()}
+              </div>
+              <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                Hold active until {reservation.reservedUntil ? new Date(reservation.reservedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'match time'}
+              </div>
+            </div>
+          ) : (
+            <div style={styles.kioskTitleBadge}>STATION LOCKED</div>
+          )}
           <h1 className="cyber-glitch-text" style={styles.pcHeader}>
             {pcLabel}
           </h1>
-          <p style={styles.subText}>Scan with PC Club Mobile App to book and start instantly</p>
+          <p style={styles.subText}>
+            {reservation?.isReserved
+              ? `Scan or log in as @${reservation.reservedFor} to start your booked slot`
+              : 'Scan with PC Club Mobile App to start instantly'}
+          </p>
 
           <div style={styles.qrWrapper}>
             <QRCodeSVG
-              value={`${MOBILE_APP_URL}?pc_id=${encodeURIComponent(pcId)}`}
+              value={JSON.stringify({ pc_id: pcId, qr_token: qrToken })}
               size={180}
               bgColor="#070913"
               fgColor="#00f0ff"
@@ -196,6 +257,12 @@ export default function LockScreen({ onUnlock, onOpenAdmin }: LockScreenProps) {
               includeMargin={false}
             />
             <div style={styles.qrScannerBeam}></div>
+          </div>
+
+          <div style={styles.tokenStatusBadge}>
+            <span style={{ color: '#00ff88', fontSize: '11px', fontWeight: 'bold' }}>
+              ⚡ Dynamic Anti-Replay QR Active
+            </span>
           </div>
 
           <div style={styles.appPromoContainer}>
@@ -282,6 +349,22 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 16px',
     fontSize: '12px',
     letterSpacing: '0.8px',
+  },
+  reservedBanner: {
+    padding: '12px 16px',
+    backgroundColor: 'rgba(181, 23, 158, 0.25)',
+    border: '1px solid #ffea00',
+    borderRadius: '10px',
+    textAlign: 'center',
+    marginBottom: '12px',
+    boxShadow: '0 0 15px rgba(255, 234, 0, 0.25)',
+  },
+  tokenStatusBadge: {
+    marginTop: '10px',
+    padding: '4px 12px',
+    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+    border: '1px solid rgba(0, 255, 136, 0.3)',
+    borderRadius: '20px',
   },
   disconnectedBanner: {
     margin: '10px 0',

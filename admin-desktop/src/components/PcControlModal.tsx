@@ -4,27 +4,32 @@ import { ClubPc, Tariff } from '../types';
 interface PcControlModalProps {
   pc: ClubPc;
   tariffs: Tariff[];
+  allPcs?: ClubPc[];
   onClose: () => void;
   onUnlock: (pc: ClubPc, username: string, seconds: number) => Promise<void>;
   onLock: (pc: ClubPc) => Promise<void>;
   onExtend: (pc: ClubPc, seconds: number) => Promise<void>;
   onReboot: (pc: ClubPc) => Promise<void>;
   onShutdown: (pc: ClubPc) => Promise<void>;
+  onTransfer?: (fromPc: ClubPc, toPcId: string) => Promise<void>;
 }
 
 export default function PcControlModal({
   pc,
   tariffs,
+  allPcs = [],
   onClose,
   onUnlock,
   onLock,
   onExtend,
   onReboot,
   onShutdown,
+  onTransfer,
 }: PcControlModalProps) {
   const [activeTab, setActiveTab] = useState<'session' | 'telemetry'>('session');
   const [username, setUsername] = useState('player1');
   const [selectedDuration, setSelectedDuration] = useState(3600); // 1 hour default
+  const [targetPcId, setTargetPcId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -71,6 +76,31 @@ export default function PcControlModal({
       await onLock(pc);
       setFeedback('Station locked and processes terminated.');
       setTimeout(() => onClose(), 800);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const freePcs = (allPcs || []).filter(
+    (p) => (p.pc_id !== pc.pc_id && p.id !== pc.id) && (p.status === 'FREE' || p.status === 'OFFLINE')
+  );
+
+  const handleTransferSession = async () => {
+    if (!targetPcId) return;
+    const targetObj = freePcs.find((p) => p.pc_id === targetPcId || p.id === targetPcId);
+    const targetLabel = targetObj ? targetObj.label : targetPcId;
+    if (!confirm(`Transfer active session of ${pc.current_user} to ${targetLabel}?`)) return;
+
+    setIsSubmitting(true);
+    setFeedback(`Moving session to ${targetLabel}...`);
+    try {
+      if (onTransfer) {
+        await onTransfer(pc, targetPcId);
+        setFeedback(`Session successfully transferred to ${targetLabel}!`);
+        setTimeout(() => onClose(), 800);
+      }
+    } catch (err: any) {
+      setFeedback(err.message || 'Failed to move player session.');
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +233,39 @@ export default function PcControlModal({
                   >
                     +2 Hours
                   </button>
+                </div>
+
+                {/* Transfer Session / Move Player to Another Station */}
+                <div style={styles.transferZone}>
+                  <div style={styles.sectionHeader}>MOVE PLAYER TO ANOTHER PC</div>
+                  <p style={styles.transferHint}>
+                    Transfer {pc.current_user}'s session with {Math.floor((pc.remaining_seconds || 0) / 60)}m remaining to another station.
+                    This PC will be locked; the target PC will unlock immediately.
+                  </p>
+                  <div style={styles.transferRow}>
+                    <select
+                      value={targetPcId}
+                      onChange={(e) => setTargetPcId(e.target.value)}
+                      className="cyber-input"
+                      style={styles.transferSelect}
+                    >
+                      <option value="">-- Select Target Free Station ({freePcs.length} available) --</option>
+                      {freePcs.map((target) => (
+                        <option key={target.pc_id || target.id} value={target.pc_id || target.id}>
+                          {target.label} ({target.zone}) - {target.status}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleTransferSession}
+                      disabled={!targetPcId || isSubmitting}
+                      className="cyber-button"
+                      style={styles.transferBtn}
+                    >
+                      🔄 MOVE PLAYER
+                    </button>
+                  </div>
                 </div>
 
                 <div style={styles.dangerZone}>
@@ -604,6 +667,39 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: '12px',
     fontSize: '12px',
+  },
+  transferZone: {
+    backgroundColor: 'rgba(0, 240, 255, 0.05)',
+    border: '1px solid rgba(0, 240, 255, 0.25)',
+    borderRadius: '10px',
+    padding: '16px',
+    marginTop: '16px',
+    marginBottom: '10px',
+  },
+  transferHint: {
+    fontSize: '12px',
+    color: '#94a3b8',
+    lineHeight: 1.5,
+    margin: '4px 0 12px 0',
+  },
+  transferRow: {
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+  },
+  transferSelect: {
+    flex: 1,
+    padding: '10px 14px',
+    fontSize: '12px',
+    backgroundColor: '#070913',
+    color: '#fff',
+    border: '1px solid var(--border-neon)',
+    borderRadius: '8px',
+  },
+  transferBtn: {
+    padding: '10px 18px',
+    fontSize: '12px',
+    whiteSpace: 'nowrap',
   },
   dangerZone: {
     backgroundColor: 'rgba(255, 0, 85, 0.08)',

@@ -4,8 +4,7 @@ import { getAppConfig } from './config';
 type MessageHandler = (message: ServerMessage) => void;
 
 const HEARTBEAT_INTERVAL = 5_000; // 5 seconds telemetry heartbeat
-const BASE_RECONNECT_DELAY = 1_000;
-const MAX_RECONNECT_DELAY = 15_000;
+const RECONNECT_DELAY = 2_000; // Fast 2-second aggressive auto-reconnect for production stability
 
 class SocketService {
   private ws: WebSocket | null = null;
@@ -210,14 +209,13 @@ class SocketService {
   }
 
   private scheduleReconnect(): void {
-    const delay = Math.min(
-      BASE_RECONNECT_DELAY * Math.pow(2, this.reconnectAttempt),
-      MAX_RECONNECT_DELAY,
-    );
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempt++;
       this.doConnect();
-    }, delay);
+    }, RECONNECT_DELAY);
   }
 
   disconnect(): void {

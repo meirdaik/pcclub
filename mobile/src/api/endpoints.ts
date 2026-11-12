@@ -91,3 +91,19 @@ export const createPayment = (bookingId: string, method: PaymentMethod, idempote
  */
 export const simulateMockPayment = (paymentId: string, outcome: 'complete' | 'fail') =>
   api<Payment>('POST', `/v1/payments/mock/${paymentId}/${outcome}`);
+
+// --- qr unlock ---
+
+export interface QrUnlockPayload {
+  pc_id: string;
+  qr_token: string;
+  duration_minutes?: number;
+  tariff_id?: string;
+  username?: string;
+}
+
+export const qrUnlockPc = (payload: QrUnlockPayload) =>
+  api<{ ok: boolean; detail: string; data?: unknown }>('POST', '/v1/pc/qr-unlock', {
+    body: payload,
+    auth: false,
+  });

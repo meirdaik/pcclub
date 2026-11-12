@@ -4,6 +4,7 @@ Maintains live WebSocket connections, session states, and telemetry data.
 """
 
 import logging
+import secrets
 import time
 from typing import Any
 
@@ -21,6 +22,8 @@ class PcSessionManager:
         self._aliases: dict[str, str] = {}
         self._telemetry: dict[str, dict[str, Any]] = {}
         self._chat_messages: list[dict[str, Any]] = []
+        self._qr_tokens: dict[str, dict[str, Any]] = {}
+        self._reservations: dict[str, dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -250,6 +253,62 @@ class PcSessionManager:
         record["alert"] = alert_message
         record["status"] = "ALERT"
         record["last_heartbeat"] = time.time()
+
+    def issue_qr_token(self, pc_id: str, ttl_seconds: int = 120) -> str:
+        """Issue a rotating anti-replay token for this PC."""
+        target = self._aliases.get(pc_id, pc_id)
+        token = secrets.token_urlsafe(16)
+        now = time.time()
+        self._qr_tokens[target] = {
+            "token": token,
+            "issued_at": now,
+            "expires_at": now + ttl_seconds,
+        }
+        return token
+
+    def get_or_issue_qr_token(self, pc_id: str, ttl_seconds: int = 120) -> str:
+        """Return valid active QR token or generate a new one if expired."""
+        target = self._aliases.get(pc_id, pc_id)
+        record = self._qr_tokens.get(target)
+        if record and time.time() < record.get("expires_at", 0):
+            return record["token"]
+        return self.issue_qr_token(pc_id, ttl_seconds)
+
+    def validate_and_consume_qr_token(self, pc_id: str, token: str) -> bool:
+        """Validate token and consume it (anti-replay). Returns True if valid."""
+        target = self._aliases.get(pc_id, pc_id)
+        # Check by target canonical id or raw pc_id
+        record = self._qr_tokens.get(target) or self._qr_tokens.get(pc_id)
+        if not record:
+            return False
+        if time.time() > record.get("expires_at", 0):
+            self._qr_tokens.pop(target, None)
+            self._qr_tokens.pop(pc_id, None)
+            return False
+        if record.get("token") == token:
+            # Consume token immediately to prevent replay attacks
+            self._qr_tokens.pop(target, None)
+            self._qr_tokens.pop(pc_id, None)
+            return True
+        return False
+
+    def set_reservation(self, pc_id: str, user: str, starts_at: str, ends_at: str) -> None:
+        target = self._aliases.get(pc_id, pc_id)
+        self._reservations[target] = {
+            "user": user,
+            "starts_at": starts_at,
+            "ends_at": ends_at,
+            "timestamp": time.time(),
+        }
+
+    def clear_reservation(self, pc_id: str) -> None:
+        target = self._aliases.get(pc_id, pc_id)
+        self._reservations.pop(target, None)
+        self._reservations.pop(pc_id, None)
+
+    def get_reservation(self, pc_id: str) -> dict[str, Any] | None:
+        target = self._aliases.get(pc_id, pc_id)
+        return self._reservations.get(target) or self._reservations.get(pc_id)
 
     def clear_alert(self, pc_id: str) -> None:
         target = self._aliases.get(pc_id, pc_id)

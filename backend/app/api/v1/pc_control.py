@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,8 +13,9 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import SessionDep, SettingsDep
 from app.api.v1.pc_ws import _resolve_pc
 from app.core.security import verify_password
+from app.models.booking import Booking
 from app.models.club import Pc
-from app.models.kiosk import CashierShift, GamingSession, SessionStatus, SnackOrder, Tariff
+from app.models.kiosk import CashierShift, GamingSession, SessionStatus, SnackOrder, Tariff, Transaction
 from app.models.user import User
 from app.services.pc_session import PcSessionManager, get_pc_session_manager
 
@@ -32,6 +33,14 @@ class UnlockRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
     password: str | None = None
     remaining_seconds: int = Field(3600, gt=0)
+    tariff_id: str | None = None
+
+
+class QrUnlockRequest(BaseModel):
+    pc_id: str = Field(..., min_length=1)
+    qr_token: str = Field(..., min_length=1)
+    username: str | None = None
+    duration_minutes: int = Field(60, gt=0)
     tariff_id: str | None = None
 
 
@@ -133,12 +142,27 @@ async def unlock_pc(
     elif body.password and settings.environment != "dev":
         raise HTTPException(status_code=401, detail="User account not found")
 
+    # Check if station is reserved for another user
+    res = manager.get_reservation(pc_id) or (manager.get_reservation(str(pc.id)) if pc else None)
+    if res and not is_admin_user:
+        res_user = res.get("user", "")
+        if res_user and body.username.lower() != res_user.lower():
+            raise HTTPException(
+                status_code=403,
+                detail=f"Station is reserved for @{res_user}. Only @{res_user} or an Admin can unlock.",
+            )
+        manager.clear_reservation(pc_id)
+        if pc:
+            manager.clear_reservation(str(pc.id))
+
     # 3. Create or update GamingSession record if user and pc exist
     if user and pc:
+        end_time = datetime.now(UTC) + timedelta(seconds=body.remaining_seconds)
         gaming_session = GamingSession(
             user_id=user.id,
             pc_id=pc.id,
             start_time=datetime.now(UTC),
+            end_time=end_time,
             remaining_seconds=body.remaining_seconds,
             status=SessionStatus.ACTIVE,
         )
@@ -261,6 +285,279 @@ async def lock_pc(
 
     logger.info("PC %s: LOCK command sent", pc_id)
     return CommandResult(ok=True, detail=f"LOCK sent to {pc_id}")
+
+
+@router.post("/qr-unlock")
+async def qr_unlock_pc(
+    body: QrUnlockRequest,
+    session: SessionDep,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Validate dynamic anti-replay QR token, deduct player balance, and unlock PC."""
+    pc_key = str(body.pc_id)
+    pc = await _resolve_pc(session, pc_key)
+
+    # 1. Validate and consume rotating anti-replay token
+    token_valid = manager.validate_and_consume_qr_token(pc_key, body.qr_token)
+    if not token_valid and pc:
+        token_valid = manager.validate_and_consume_qr_token(str(pc.id), body.qr_token)
+
+    if not token_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired anti-replay QR token. Please scan the current code on screen.",
+        )
+
+    # 2. Check current status (prevent double unlock)
+    current_state = manager.get_pc_state(pc_key)
+    if current_state.get("status") == "BUSY":
+        raise HTTPException(status_code=400, detail=f"Station {pc_key} is already occupied.")
+
+    # 3. Resolve player account
+    uname = body.username or "player1"
+    user_stmt = select(User).where(or_(User.username == uname, User.phone == uname))
+    user = (await session.scalars(user_stmt)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User account '{uname}' not found.")
+
+    # Check reservation
+    res = manager.get_reservation(pc_key) or (manager.get_reservation(str(pc.id)) if pc else None)
+    if res:
+        res_user = res.get("user", "")
+        if res_user and user.username.lower() != res_user.lower() and user.role != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Station is reserved for @{res_user}. Only @{res_user} or Admin can unlock.",
+            )
+        manager.clear_reservation(pc_key)
+        if pc:
+            manager.clear_reservation(str(pc.id))
+
+    # 4. Calculate cost & deduct from player balance
+    duration_sec = body.duration_minutes * 60
+    cost_kzt = 0
+    if body.tariff_id:
+        try:
+            tariff = await session.get(Tariff, uuid.UUID(body.tariff_id))
+            if tariff:
+                cost_kzt = tariff.price_kzt
+        except Exception:
+            pass
+    if cost_kzt == 0:
+        cost_kzt = max(500, int((body.duration_minutes / 60) * 1000))
+
+    if user.balance_kzt < cost_kzt and user.role != "admin":
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient balance. Session costs {cost_kzt} ₸, current balance is {user.balance_kzt} ₸.",
+        )
+
+    user.balance_kzt -= cost_kzt
+
+    # 5. Record Transaction, Session, Shift revenue
+    if pc:
+        tx = Transaction(
+            user_id=user.id,
+            pc_id=pc.id,
+            amount_kzt=-cost_kzt,
+            type="SESSION",
+            description=f"QR Unlock Station {pc.label} ({body.duration_minutes}m)",
+            status="SUCCEEDED",
+        )
+        session.add(tx)
+
+        end_time = datetime.now(UTC) + timedelta(seconds=duration_sec)
+        gaming_session = GamingSession(
+            user_id=user.id,
+            pc_id=pc.id,
+            start_time=datetime.now(UTC),
+            end_time=end_time,
+            remaining_seconds=duration_sec,
+            status=SessionStatus.ACTIVE,
+        )
+        session.add(gaming_session)
+        pc.session_status = "BUSY"
+        pc.current_user_id = user.id
+        pc.remaining_seconds = duration_sec
+
+        shift = await session.scalar(select(CashierShift).where(CashierShift.is_active == True).limit(1))  # noqa: E712
+        if not shift:
+            shift = CashierShift(cashier_name="Admin Cashier", is_active=True)
+            session.add(shift)
+            await session.flush()
+        shift.total_sessions += 1
+        shift.session_revenue_kzt += cost_kzt
+        shift.total_revenue_kzt = shift.session_revenue_kzt + shift.order_revenue_kzt
+        await session.commit()
+
+    # 6. Send UNLOCK command via WebSocket
+    payload = {
+        "username": user.username,
+        "remaining_seconds": duration_sec,
+        "is_admin": user.role == "admin",
+        "balance": user.balance_kzt,
+    }
+    sent = await manager.send_command(pc_key, "UNLOCK", payload)
+    if not sent and pc:
+        sent = await manager.send_command(str(pc.id), "UNLOCK", payload)
+
+    manager.update_telemetry(
+        pc_key,
+        {
+            "status": "BUSY",
+            "current_user": user.username,
+            "remaining_seconds": duration_sec,
+        },
+    )
+    if pc:
+        manager.update_telemetry(
+            str(pc.id),
+            {
+                "status": "BUSY",
+                "current_user": user.username,
+                "remaining_seconds": duration_sec,
+            },
+        )
+
+    logger.info("PC %s: QR UNLOCK succeeded for %s (cost: %d ₸)", pc_key, user.username, cost_kzt)
+    return CommandResult(
+        ok=True,
+        detail=f"Station {pc_key} unlocked via QR scan for {user.username}",
+        data={
+            "username": user.username,
+            "remaining_seconds": duration_sec,
+            "balance_kzt": user.balance_kzt,
+            "cost_kzt": cost_kzt,
+        },
+    )
+
+
+@router.post("/{from_pc_id}/transfer/{to_pc_id}")
+async def transfer_pc_session(
+    from_pc_id: str,
+    to_pc_id: str,
+    session: SessionDep,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Atomically transfer an active gaming session from one PC to another."""
+    from_pc = await _resolve_pc(session, from_pc_id)
+    to_pc = await _resolve_pc(session, to_pc_id)
+
+    from_state = manager.get_pc_state(from_pc_id)
+    to_state = manager.get_pc_state(to_pc_id)
+
+    is_busy = from_state.get("status") == "BUSY" or (from_pc and from_pc.session_status == "BUSY")
+    if not is_busy:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source station {from_pc_id} does not have an active session to transfer.",
+        )
+
+    to_busy = to_state.get("status") == "BUSY" or (to_pc and to_pc.session_status == "BUSY")
+    if to_busy:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Target station {to_pc_id} is already BUSY.",
+        )
+
+    # Get remaining seconds and user
+    rem_sec = from_state.get("remaining_seconds") or (from_pc.remaining_seconds if from_pc else 3600)
+    rem_sec = max(60, int(rem_sec))
+    username = from_state.get("current_user") or "Player"
+    user = None
+    if from_pc and from_pc.current_user_id:
+        user = await session.get(User, from_pc.current_user_id)
+    if not user:
+        user = await session.scalar(select(User).where(User.username == username))
+
+    # 1. Update Database records atomically
+    if from_pc and to_pc:
+        active_sess_stmt = (
+            select(GamingSession)
+            .where(
+                GamingSession.pc_id == from_pc.id,
+                GamingSession.status == SessionStatus.ACTIVE,
+            )
+            .order_by(GamingSession.start_time.desc())
+            .limit(1)
+        )
+        active_sess = (await session.scalars(active_sess_stmt)).first()
+        if active_sess:
+            active_sess.status = SessionStatus.COMPLETED
+
+        new_sess = GamingSession(
+            user_id=user.id if user else (from_pc.current_user_id or uuid.uuid4()),
+            pc_id=to_pc.id,
+            start_time=datetime.now(UTC),
+            end_time=datetime.now(UTC) + timedelta(seconds=rem_sec),
+            remaining_seconds=rem_sec,
+            status=SessionStatus.ACTIVE,
+        )
+        session.add(new_sess)
+
+        from_pc.session_status = "FREE"
+        from_pc.current_user_id = None
+        from_pc.remaining_seconds = 0
+        from_pc.current_game = None
+
+        to_pc.session_status = "BUSY"
+        to_pc.current_user_id = user.id if user else None
+        to_pc.remaining_seconds = rem_sec
+
+        await session.commit()
+
+    # 2. Lock Source Station
+    await manager.send_command(from_pc_id, "LOCK")
+    if from_pc:
+        await manager.send_command(str(from_pc.id), "LOCK")
+    manager.update_telemetry(
+        from_pc_id,
+        {"status": "FREE", "current_user": None, "remaining_seconds": 0, "active_game": None},
+    )
+    if from_pc:
+        manager.update_telemetry(
+            str(from_pc.id),
+            {"status": "FREE", "current_user": None, "remaining_seconds": 0, "active_game": None},
+        )
+
+    # 3. Unlock Target Station with remaining time
+    unlock_payload = {
+        "username": username,
+        "remaining_seconds": rem_sec,
+        "is_admin": (user.role == "admin") if user else False,
+        "balance": user.balance_kzt if user else 5000,
+        "transferred_from": from_pc_id,
+    }
+    await manager.send_command(to_pc_id, "UNLOCK", unlock_payload)
+    if to_pc:
+        await manager.send_command(str(to_pc.id), "UNLOCK", unlock_payload)
+    manager.update_telemetry(
+        to_pc_id,
+        {"status": "BUSY", "current_user": username, "remaining_seconds": rem_sec},
+    )
+    if to_pc:
+        manager.update_telemetry(
+            str(to_pc.id),
+            {"status": "BUSY", "current_user": username, "remaining_seconds": rem_sec},
+        )
+
+    logger.info(
+        "Session transfer: %s -> %s for user %s (%d seconds)",
+        from_pc_id,
+        to_pc_id,
+        username,
+        rem_sec,
+    )
+    return CommandResult(
+        ok=True,
+        detail=f"Session for {username} successfully moved from {from_pc_id} to {to_pc_id}",
+        data={
+            "from_pc": from_pc_id,
+            "to_pc": to_pc_id,
+            "username": username,
+            "remaining_seconds": rem_sec,
+        },
+    )
 
 
 @router.post("/{pc_id}/extend")
@@ -524,11 +821,45 @@ async def list_admin_pcs(
             current_user = telemetry.get("current_user")
             active_game = telemetry.get("active_game", p.current_game)
 
-            # Determine live status: ALERT > BUSY > FREE > OFFLINE
+            # Check upcoming booking within next 15 minutes (RESERVED hold state)
+            now_utc = datetime.now(UTC)
+            hold_window = now_utc + timedelta(minutes=15)
+            booking_stmt = (
+                select(Booking, User.username)
+                .join(User, Booking.user_id == User.id)
+                .where(
+                    Booking.pc_id == p.id,
+                    Booking.status.in_(["confirmed", "pending_payment"]),
+                    Booking.starts_at <= hold_window,
+                    Booking.ends_at > now_utc,
+                )
+                .order_by(Booking.starts_at.asc())
+            )
+            upcoming_booking = (await session.execute(booking_stmt)).first()
+
+            reservation_data = None
+            if upcoming_booking is not None:
+                b_obj, b_user = upcoming_booking
+                reservation_data = {
+                    "user": b_user,
+                    "starts_at": b_obj.starts_at.isoformat(),
+                    "ends_at": b_obj.ends_at.isoformat(),
+                }
+                manager.set_reservation(canonical_key, b_user, b_obj.starts_at.isoformat(), b_obj.ends_at.isoformat())
+                manager.set_reservation(str(p.id), b_user, b_obj.starts_at.isoformat(), b_obj.ends_at.isoformat())
+            else:
+                existing_res = manager.get_reservation(canonical_key)
+                if existing_res:
+                    reservation_data = existing_res
+
+            # Determine live status: ALERT > BUSY > RESERVED > FREE > OFFLINE
             if alert:
                 computed_status = "ALERT"
             elif rem_sec > 0:
                 computed_status = "BUSY"
+            elif reservation_data:
+                computed_status = "RESERVED"
+                current_user = reservation_data.get("user")
             elif is_online:
                 computed_status = "FREE"
             else:
@@ -553,6 +884,7 @@ async def list_admin_pcs(
                     "remaining_seconds": rem_sec,
                     "current_game": active_game,
                     "alert": alert,
+                    "reservation": reservation_data,
                     "specs": p.specs,
                     "cpu_usage": telemetry.get("cpu_usage", 18 if computed_status == "BUSY" else 4),
                     "memory_usage": telemetry.get("memory_usage", 42 if computed_status == "BUSY" else 15),
@@ -750,3 +1082,15 @@ async def close_shift_and_generate_z_report(
 
     logger.info("Cashier shift %s closed. Z-Report generated: Total %d₸", shift.id, shift.total_revenue_kzt)
     return z_report
+
+
+@admin_router.post("/pcs/{from_pc_id}/transfer/{to_pc_id}")
+async def admin_transfer_pc_session(
+    from_pc_id: str,
+    to_pc_id: str,
+    session: SessionDep,
+    manager: PcSessionManager = Depends(get_pc_session_manager),
+) -> CommandResult:
+    """Admin endpoint to transfer session from one PC to another."""
+    return await transfer_pc_session(from_pc_id, to_pc_id, session, manager)
+

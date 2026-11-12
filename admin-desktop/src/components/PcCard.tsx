@@ -43,6 +43,7 @@ export default function PcCard({
 
   const isAlert = pc.status === 'ALERT';
   const isBusy = pc.status === 'BUSY';
+  const isReserved = pc.status === 'RESERVED';
   const isFree = pc.status === 'FREE';
   const isOffline = pc.status === 'OFFLINE';
 
@@ -50,6 +51,8 @@ export default function PcCard({
     ? 'var(--status-alert)'
     : isBusy
     ? 'var(--status-busy)'
+    : isReserved
+    ? '#ff9f1c'
     : isFree
     ? 'var(--status-free)'
     : 'var(--status-offline)';
@@ -58,6 +61,8 @@ export default function PcCard({
     ? '⚠️ ATTENTION'
     : isBusy
     ? 'BUSY'
+    : isReserved
+    ? '📅 RESERVED'
     : isFree
     ? 'READY'
     : 'OFFLINE';
@@ -256,6 +261,19 @@ export default function PcCard({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {isReserved && (
+          <div style={styles.reservedStateBox}>
+            <div style={styles.reservedCircle}>📅</div>
+            <div style={styles.reservedHeading} className="font-orbitron">
+              RESERVED HOLD
+            </div>
+            <div style={styles.reservedUserText}>
+              @{pc.reservation?.user || pc.current_user || 'Player'}
+            </div>
+            <div style={styles.reservedSub}>Mobile Booking within 15 mins</div>
           </div>
         )}
 
@@ -533,6 +551,39 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     borderRadius: '2px',
     transition: 'width 0.3s',
+  },
+  reservedStateBox: {
+    textAlign: 'center',
+    padding: '8px 0',
+  },
+  reservedCircle: {
+    width: '36px',
+    height: '36px',
+    margin: '0 auto 6px auto',
+    borderRadius: '50%',
+    border: '2px solid #ff9f1c',
+    color: '#ff9f1c',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+  },
+  reservedHeading: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#ff9f1c',
+    letterSpacing: '1px',
+    marginBottom: '2px',
+  },
+  reservedUserText: {
+    fontSize: '14px',
+    fontWeight: 800,
+    color: '#ffea00',
+    marginBottom: '2px',
+  },
+  reservedSub: {
+    fontSize: '11px',
+    color: 'var(--text-muted)',
   },
   freeStateBox: {
     textAlign: 'center',

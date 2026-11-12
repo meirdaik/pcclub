@@ -96,6 +96,28 @@ class AdminApiClient {
     return false;
   }
 
+  async transferPcSession(fromPcId: string, toPcId: string): Promise<{ ok: boolean; detail?: string }> {
+    const urls = [
+      `${this.baseUrl}/api/pc/${encodeURIComponent(fromPcId)}/transfer/${encodeURIComponent(toPcId)}`,
+      `${this.baseUrl}/api/admin/pcs/${encodeURIComponent(fromPcId)}/transfer/${encodeURIComponent(toPcId)}`,
+      `${this.baseUrl}/v1/pc/${encodeURIComponent(fromPcId)}/transfer/${encodeURIComponent(toPcId)}`,
+    ];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (res.ok) return { ok: true, detail: data.detail };
+        return { ok: false, detail: data.detail || 'Transfer failed' };
+      } catch {
+        // try fallback
+      }
+    }
+    return { ok: false, detail: 'Network error transferring player session' };
+  }
+
   async extendPc(pcId: string, additionalSeconds: number): Promise<boolean> {
     const urls = [
       `${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/extend`,
