@@ -123,6 +123,91 @@ export default function PcCard({
         </div>
       )}
 
+      {/* BIOS & Anti-Cheat Security Badges */}
+      <div style={styles.securityBadgeRow}>
+        <span
+          style={{
+            ...styles.secBadge,
+            backgroundColor:
+              pc.security?.secureBoot === 'ENABLED'
+                ? 'rgba(0, 255, 136, 0.15)'
+                : pc.security?.secureBoot === 'DISABLED'
+                ? 'rgba(255, 0, 85, 0.2)'
+                : 'rgba(255, 234, 0, 0.15)',
+            borderColor:
+              pc.security?.secureBoot === 'ENABLED'
+                ? '#00ff88'
+                : pc.security?.secureBoot === 'DISABLED'
+                ? '#ff0055'
+                : '#ffea00',
+            color:
+              pc.security?.secureBoot === 'ENABLED'
+                ? '#00ff88'
+                : pc.security?.secureBoot === 'DISABLED'
+                ? '#ff0055'
+                : '#ffea00',
+          }}
+          title={
+            pc.security?.secureBoot === 'ENABLED'
+              ? 'UEFI Secure Boot is Active'
+              : pc.security?.secureBoot === 'DISABLED'
+              ? 'UEFI Secure Boot is OFF'
+              : 'Legacy BIOS / Unsupported'
+          }
+        >
+          {pc.security?.secureBoot === 'ENABLED'
+            ? '🛡️ SB: ON'
+            : pc.security?.secureBoot === 'DISABLED'
+            ? '⚠️ SB: OFF'
+            : '⚙️ BIOS'}
+        </span>
+
+        <span
+          style={{
+            ...styles.secBadge,
+            backgroundColor: pc.security?.tpmPresent ? 'rgba(0, 240, 255, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+            borderColor: pc.security?.tpmPresent ? '#00f0ff' : 'var(--border-subtle)',
+            color: pc.security?.tpmPresent ? '#00f0ff' : 'var(--text-muted)',
+          }}
+          title={pc.security?.tpmPresent ? 'TPM 2.0 Security Chip Present' : 'No TPM Chip Detected'}
+        >
+          {pc.security?.tpmPresent ? '🔒 TPM 2.0' : '🔓 NO TPM'}
+        </span>
+
+        {(pc.security?.faceitInstalled || pc.security?.vanguardInstalled) && (
+          <span
+            style={{
+              ...styles.secBadge,
+              backgroundColor: 'rgba(157, 78, 221, 0.2)',
+              borderColor: '#9d4edd',
+              color: '#e0aaff',
+            }}
+            title={`Anti-Cheat Services: ${[
+              pc.security?.faceitInstalled ? 'FACEIT AC' : null,
+              pc.security?.vanguardInstalled ? 'Riot Vanguard' : null,
+            ]
+              .filter(Boolean)
+              .join(' + ')}`}
+          >
+            ⚡ {pc.security?.faceitInstalled && pc.security?.vanguardInstalled ? 'AC: VG+FC' : pc.security?.faceitInstalled ? 'FACEIT' : 'VANGUARD'}
+          </span>
+        )}
+
+        {pc.maintenance_mode && (
+          <span
+            style={{
+              ...styles.secBadge,
+              backgroundColor: 'rgba(255, 170, 0, 0.25)',
+              borderColor: '#ffaa00',
+              color: '#ffaa00',
+            }}
+            title="Technician Maintenance Mode Active"
+          >
+            🛠️ MAINT
+          </span>
+        )}
+      </div>
+
       {/* Main Card Body */}
       <div style={styles.cardBody} onClick={() => onOpenControl(pc)}>
         {isBusy && (
@@ -307,6 +392,26 @@ const styles: Record<string, React.CSSProperties> = {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
+  },
+  securityBadgeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 14px',
+    backgroundColor: 'rgba(5, 7, 15, 0.4)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+    flexWrap: 'wrap',
+  },
+  secBadge: {
+    fontSize: '10px',
+    fontWeight: 700,
+    letterSpacing: '0.4px',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    border: '1px solid',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '3px',
   },
   alertRibbon: {
     backgroundColor: 'rgba(255, 234, 0, 0.15)',

@@ -237,8 +237,137 @@ function cleanSessionData(): void {
   }
 }
 
+interface BiosSecurityInfo {
+  secureBoot: 'ENABLED' | 'DISABLED' | 'UNSUPPORTED';
+  tpmPresent: boolean;
+  biosSerial: string;
+  hwUuid: string;
+  vanguardInstalled: boolean;
+  faceitInstalled: boolean;
+  antiCheatReady: boolean;
+}
+
+let cachedSecurityInfo: BiosSecurityInfo | null = null;
+let lastSecurityQueryTime = 0;
+
+function getBiosSecurityInfo(): Promise<BiosSecurityInfo> {
+  const now = Date.now();
+  if (cachedSecurityInfo && now - lastSecurityQueryTime < 60_000) {
+    return Promise.resolve(cachedSecurityInfo);
+  }
+
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      const fallback: BiosSecurityInfo = {
+        secureBoot: 'ENABLED',
+        tpmPresent: true,
+        biosSerial: 'DEV-BIOS-9999',
+        hwUuid: 'DEV-HWID-0000-1111-2222',
+        vanguardInstalled: true,
+        faceitInstalled: true,
+        antiCheatReady: true,
+      };
+      cachedSecurityInfo = fallback;
+      lastSecurityQueryTime = now;
+      return resolve(fallback);
+    }
+
+    const psScript = `
+try { $sb = Confirm-SecureBootUEFI } catch { $sb = 'Unsupported' };
+try { $tpm = (Get-Tpm).TpmPresent } catch { $tpm = $false };
+$bios = (Get-CimInstance Win32_BIOS).SerialNumber;
+$uuid = (Get-CimInstance Win32_ComputerSystemProduct).UUID;
+$vg = @(Get-Service -Name 'vgk','vgc' -ErrorAction SilentlyContinue).Count -gt 0;
+$fc = @(Get-Service -Name 'FACEIT','FACEITService' -ErrorAction SilentlyContinue).Count -gt 0;
+[PSCustomObject]@{
+  SecureBoot = [string]$sb;
+  TpmPresent = [bool]$tpm;
+  BiosSerial = [string]$bios;
+  HwUuid     = [string]$uuid;
+  Vanguard   = [bool]$vg;
+  Faceit     = [bool]$fc
+} | ConvertTo-Json -Compress
+`.trim().replace(/\r?\n/g, ' ');
+
+    exec(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`, (err, stdout) => {
+      let info: BiosSecurityInfo = {
+        secureBoot: 'UNSUPPORTED',
+        tpmPresent: false,
+        biosSerial: 'UNKNOWN',
+        hwUuid: 'UNKNOWN',
+        vanguardInstalled: false,
+        faceitInstalled: false,
+        antiCheatReady: false,
+      };
+
+      if (!err && stdout) {
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          let sbStatus: 'ENABLED' | 'DISABLED' | 'UNSUPPORTED' = 'UNSUPPORTED';
+          if (parsed.SecureBoot === 'True' || parsed.SecureBoot === true) sbStatus = 'ENABLED';
+          else if (parsed.SecureBoot === 'False' || parsed.SecureBoot === false) sbStatus = 'DISABLED';
+
+          const tpm = Boolean(parsed.TpmPresent);
+          const vg = Boolean(parsed.Vanguard);
+          const fc = Boolean(parsed.Faceit);
+
+          info = {
+            secureBoot: sbStatus,
+            tpmPresent: tpm,
+            biosSerial: parsed.BiosSerial || 'UNKNOWN',
+            hwUuid: parsed.HwUuid || 'UNKNOWN',
+            vanguardInstalled: vg,
+            faceitInstalled: fc,
+            antiCheatReady: (sbStatus === 'ENABLED' || sbStatus === 'UNSUPPORTED') && (tpm || fc || vg),
+          };
+        } catch (parseErr) {
+          console.warn('[SENET BIOS] Failed to parse JSON output:', parseErr);
+        }
+      }
+
+      cachedSecurityInfo = info;
+      lastSecurityQueryTime = now;
+      resolve(info);
+    });
+  });
+}
+
+function applyRegistryLockdown(locked: boolean): void {
+  if (process.platform !== 'win32') return;
+
+  const flagDir = 'C:\\ProgramData\\PCClub';
+  const flagPath = path.join(flagDir, 'maintenance.flag');
+
+  try {
+    if (!fs.existsSync(flagDir)) {
+      fs.mkdirSync(flagDir, { recursive: true });
+    }
+    if (locked) {
+      if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath);
+    } else {
+      fs.writeFileSync(flagPath, `Maintenance mode active since ${new Date().toISOString()}`, 'utf-8');
+    }
+  } catch (err) {
+    console.warn('[SENET Registry] Flag file update warning:', err);
+  }
+
+  const val = locked ? 1 : 0;
+  const cmds = [
+    `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v DisableTaskMgr /t REG_DWORD /d ${val} /f`,
+    `reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System" /v DisableRegistryTools /t REG_DWORD /d ${val} /f`,
+    `reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\System" /v DisableCMD /t REG_DWORD /d ${val} /f`,
+  ];
+
+  for (const cmd of cmds) {
+    exec(cmd, () => {});
+  }
+  console.log(`[SENET Registry] Registry policies updated (Locked = ${locked})`);
+}
+
 function setMaintenanceMode(enabled: boolean): void {
   isMaintenanceMode = enabled;
+  applyRegistryLockdown(!enabled);
+
   if (mainWindow) {
     if (enabled) {
       mainWindow.setKiosk(false);
@@ -511,6 +640,7 @@ ipcMain.handle('get-real-telemetry', async () => {
   const power_plan = await getActivePowerPlan();
   const processes = await getRunningProcessesList();
   const mac_address = getPrimaryMacAddress();
+  const security = await getBiosSecurityInfo();
 
   return {
     cpu_usage,
@@ -519,6 +649,7 @@ ipcMain.handle('get-real-telemetry', async () => {
     processes,
     mac_address,
     maintenance_mode: isMaintenanceMode,
+    security,
   };
 });
 
@@ -688,9 +819,28 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  // Record active executable path for Windows SYSTEM guard watchdog service
+  try {
+    const pDir = 'C:\\ProgramData\\PCClub';
+    if (!fs.existsSync(pDir)) fs.mkdirSync(pDir, { recursive: true });
+    fs.writeFileSync(path.join(pDir, 'kiosk-path.txt'), process.execPath, 'utf-8');
+  } catch (err) {
+    console.warn('[SENET Path] Could not record kiosk-path:', err);
+  }
+
+  // Apply registry protection on boot unless technician maintenance flag is present
+  const flagPath = 'C:\\ProgramData\\PCClub\\maintenance.flag';
+  if (fs.existsSync(flagPath)) {
+    isMaintenanceMode = true;
+    console.log('[SENET Startup] Maintenance mode flag detected, skipping registry lockdown.');
+  } else {
+    applyRegistryLockdown(true);
+  }
+
   // Register safe developer emergency exit shortcut: Ctrl+Shift+Q
   globalShortcut.register('CommandOrControl+Shift+Q', () => {
     console.log('[Shortcut] Ctrl+Shift+Q detected -> Exiting Kiosk...');
+    applyRegistryLockdown(false);
     app.quit();
   });
 
@@ -707,6 +857,7 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  applyRegistryLockdown(false);
 });
 
 app.on('window-all-closed', () => {

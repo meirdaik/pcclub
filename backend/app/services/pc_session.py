@@ -172,6 +172,7 @@ class PcSessionManager:
             "processes",
             "mac_address",
             "maintenance_mode",
+            "security",
             "specs",
         ):
             if key in data:

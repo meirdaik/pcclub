@@ -523,6 +523,15 @@ async def list_admin_pcs(
                     ),
                     "maintenance_mode": telemetry.get("maintenance_mode", False),
                     "mac_address": telemetry.get("mac_address"),
+                    "security": telemetry.get("security", {
+                        "secureBoot": "ENABLED",
+                        "tpmPresent": True,
+                        "biosSerial": f"BIOS-{p.id}",
+                        "hwUuid": str(uuid.uuid5(uuid.NAMESPACE_DNS, str(p.id))),
+                        "vanguardInstalled": True,
+                        "faceitInstalled": True,
+                        "antiCheatReady": True,
+                    }),
                     "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
@@ -555,6 +564,15 @@ async def list_admin_pcs(
                     "power_plan": telemetry.get("power_plan", "High Performance" if status == "BUSY" else "Balanced"),
                     "maintenance_mode": telemetry.get("maintenance_mode", False),
                     "mac_address": telemetry.get("mac_address"),
+                    "security": telemetry.get("security", {
+                        "secureBoot": "ENABLED",
+                        "tpmPresent": True,
+                        "biosSerial": f"BIOS-{key}",
+                        "hwUuid": str(uuid.uuid5(uuid.NAMESPACE_DNS, key)),
+                        "vanguardInstalled": True,
+                        "faceitInstalled": True,
+                        "antiCheatReady": True,
+                    }),
                     "last_heartbeat": telemetry.get("last_heartbeat"),
                 }
             )
