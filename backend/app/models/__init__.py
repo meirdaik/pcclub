@@ -4,7 +4,7 @@ from app.models.auth import OtpCode, RefreshToken
 from app.models.base import Base
 from app.models.booking import ACTIVE_BOOKING_STATUSES, Booking, BookingStatus
 from app.models.club import Club, Package, Pc, PcStatus, Zone
-from app.models.kiosk import GamingSession, SessionStatus, SnackOrder, Tariff, Transaction
+from app.models.kiosk import CashierShift, GamingSession, SessionStatus, SnackOrder, Tariff, Transaction
 from app.models.organization import Organization, StaffRole, StaffUser
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import IdentityStatus, User
@@ -14,6 +14,7 @@ __all__ = [
     "Base",
     "Booking",
     "BookingStatus",
+    "CashierShift",
     "Club",
     "GamingSession",
     "IdentityStatus",

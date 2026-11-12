@@ -174,6 +174,20 @@ async def seed() -> None:
                 ),
                 Tariff(
                     club_id=club.id,
+                    name="5 Hours Standard (Pack)",
+                    zone="Standard",
+                    duration_minutes=300,
+                    price_kzt=3800,
+                ),
+                Tariff(
+                    club_id=club.id,
+                    name="Night Pack Standard (8 Hours)",
+                    zone="Standard",
+                    duration_minutes=480,
+                    price_kzt=4500,
+                ),
+                Tariff(
+                    club_id=club.id,
                     name="1 Hour VIP",
                     zone="VIP",
                     duration_minutes=60,
@@ -185,6 +199,13 @@ async def seed() -> None:
                     zone="VIP",
                     duration_minutes=180,
                     price_kzt=4000,
+                ),
+                Tariff(
+                    club_id=club.id,
+                    name="5 Hours VIP (Pack)",
+                    zone="VIP",
+                    duration_minutes=300,
+                    price_kzt=5500,
                 ),
                 Tariff(
                     club_id=club.id,

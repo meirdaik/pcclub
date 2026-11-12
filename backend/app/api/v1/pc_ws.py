@@ -116,6 +116,12 @@ async def pc_websocket(
             elif msg_type == "clear_alert":
                 manager.clear_alert(pc_key)
                 await ws.send_json({"type": "alert_cleared"})
+            elif msg_type == "chat_message":
+                text = data.get("text", "")
+                sender = data.get("sender", "Player")
+                recorded = manager.add_chat_message(pc_key, sender, text)
+                logger.info("PC %s: CHAT [%s]: %s", pc_key, sender, text)
+                await ws.send_json({"type": "chat_ack", "message": recorded})
             elif msg_type == "status":
                 manager.update_telemetry(pc_key, data)
                 logger.debug("PC %s: status update: %s", pc_key, data)

@@ -8,7 +8,11 @@ interface HeaderBarProps {
   onRefresh: () => void;
   onOpenSettings: () => void;
   onOpenAlerts: () => void;
+  onOpenBroadcast: () => void;
+  onOpenOrders: () => void;
+  onOpenShift: () => void;
   alertCount: number;
+  pendingOrdersCount?: number;
   filterZone: string;
   setFilterZone: (z: string) => void;
   filterStatus: string;
@@ -23,7 +27,11 @@ export default function HeaderBar({
   onRefresh,
   onOpenSettings,
   onOpenAlerts,
+  onOpenBroadcast,
+  onOpenOrders,
+  onOpenShift,
   alertCount,
+  pendingOrdersCount = 0,
   filterZone,
   setFilterZone,
   filterStatus,
@@ -99,6 +107,38 @@ export default function HeaderBar({
             </div>
             <div style={styles.clockDate}>{dateStr}</div>
           </div>
+
+          <button
+            onClick={onOpenBroadcast}
+            className="cyber-button secondary"
+            style={styles.toolBtn}
+            title="Send on-screen broadcast popup to stations"
+          >
+            📢 Broadcast
+          </button>
+
+          <button
+            onClick={onOpenOrders}
+            className={`cyber-button ${pendingOrdersCount > 0 ? 'alert-pulse' : 'secondary'}`}
+            style={{
+              ...styles.toolBtn,
+              background: pendingOrdersCount > 0 ? 'rgba(245, 158, 11, 0.2)' : undefined,
+              borderColor: pendingOrdersCount > 0 ? '#f59e0b' : undefined,
+              color: pendingOrdersCount > 0 ? '#f59e0b' : undefined,
+            }}
+            title="Snack Bar Orders"
+          >
+            🍔 Bar Orders {pendingOrdersCount > 0 ? `(${pendingOrdersCount})` : ''}
+          </button>
+
+          <button
+            onClick={onOpenShift}
+            className="cyber-button secondary"
+            style={styles.toolBtn}
+            title="Cashier Shift & Fiscal Z-Report"
+          >
+            💵 Shift / Z-Report
+          </button>
 
           <button
             onClick={onRefresh}

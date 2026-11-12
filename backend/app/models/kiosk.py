@@ -109,3 +109,21 @@ class SnackOrder(Base):
     @property
     def amount(self) -> int:
         return self.amount_kzt
+
+
+class CashierShift(Base):
+    """Cashier work shift (Z-Report) tracking revenue, sessions, and orders."""
+
+    __tablename__ = "cashier_shifts"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    cashier_name: Mapped[str] = mapped_column(String(100), nullable=False, default="Admin Cashier")
+    opened_at: Mapped[datetime] = created_at_column()
+    closed_at: Mapped[datetime | None] = mapped_column(tz_datetime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    total_sessions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    session_revenue_kzt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_orders: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    order_revenue_kzt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_revenue_kzt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)

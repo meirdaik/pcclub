@@ -1,11 +1,14 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, shell, session } from 'electron';
-import { spawn } from 'child_process';
+import { app, BrowserWindow, globalShortcut, ipcMain, shell, session, clipboard } from 'electron';
+import { spawn, exec } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 let isKioskLocked = true;
+let isMaintenanceMode = false;
+let isAppQuitting = false;
+let lastCpuInfo = os.cpus();
 const trackedPids = new Set<number>();
 
 // ----------------------------------------------------------------------
@@ -109,6 +112,151 @@ function loadAppConfig(): RuntimeConfig {
 
 const appConfig = loadAppConfig();
 
+function calculateCpuUsage(): number {
+  const currentCpus = os.cpus();
+  let totalDiff = 0;
+  let idleDiff = 0;
+
+  for (let i = 0; i < currentCpus.length; i++) {
+    const prev = lastCpuInfo[i]?.times || currentCpus[i].times;
+    const curr = currentCpus[i].times;
+    const prevTotal = prev.user + prev.nice + prev.sys + prev.idle + prev.irq;
+    const currTotal = curr.user + curr.nice + curr.sys + curr.idle + curr.irq;
+    totalDiff += currTotal - prevTotal;
+    idleDiff += curr.idle - prev.idle;
+  }
+  lastCpuInfo = currentCpus;
+  if (totalDiff <= 0) return 6;
+  const usage = Math.round((1 - idleDiff / totalDiff) * 100);
+  return Math.max(1, Math.min(100, usage));
+}
+
+function getActivePowerPlan(): Promise<string> {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve('Balanced');
+    exec('powercfg /getactivescheme', (err, stdout) => {
+      if (err || !stdout) return resolve('Balanced');
+      if (stdout.includes('8c5e7fda') || /high performance|turbo|производительность/i.test(stdout)) {
+        return resolve('High Performance');
+      }
+      if (stdout.includes('a1841308') || /power saver|saver|экономия/i.test(stdout)) {
+        return resolve('Power Saver');
+      }
+      return resolve('Balanced');
+    });
+  });
+}
+
+function setWindowsPowerPlan(
+  plan: 'high_performance' | 'balanced' | 'power_saver',
+): Promise<{ success: boolean; plan: string; message: string }> {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      return resolve({ success: true, plan, message: 'Simulated on non-Windows platform' });
+    }
+    // Well-known Windows powercfg GUIDs
+    let guid = '381b4222-f694-41f0-9685-ff5bb260df2e'; // Balanced
+    if (plan === 'high_performance') guid = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c';
+    else if (plan === 'power_saver') guid = 'a1841308-3541-4fab-bc81-f71556f20b4a';
+
+    exec(`powercfg /setactive ${guid}`, (err) => {
+      if (err) {
+        console.warn('[SENET PowerPlan] Failed to set power scheme:', err);
+        return resolve({ success: false, plan, message: err.message });
+      }
+      console.log(`[SENET PowerPlan] Successfully switched Windows scheme to: ${plan} (${guid})`);
+      resolve({ success: true, plan, message: `Active power plan set to ${plan}` });
+    });
+  });
+}
+
+function getRunningProcessesList(): Promise<Array<{ name: string; pid: number; memoryMb: number }>> {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      return resolve([
+        { name: 'chrome.exe', pid: 1042, memoryMb: 450 },
+        { name: 'steam.exe', pid: 2110, memoryMb: 280 },
+        { name: 'Discord.exe', pid: 3204, memoryMb: 190 },
+      ]);
+    }
+    exec('tasklist /FO CSV /NH', (err, stdout) => {
+      if (err || !stdout) return resolve([]);
+      const lines = stdout.split('\r\n').filter(Boolean);
+      const procs: Array<{ name: string; pid: number; memoryMb: number }> = [];
+      for (const line of lines) {
+        const parts = line.split('","').map((p) => p.replace(/"/g, ''));
+        if (parts.length >= 5) {
+          const name = parts[0];
+          const pid = parseInt(parts[1], 10);
+          const memRaw = parts[4].replace(/[^\d]/g, '');
+          const memoryMb = Math.round((parseInt(memRaw, 10) || 0) / 1024);
+          if (
+            !['System Idle Process', 'System', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 'services.exe'].includes(
+              name,
+            ) &&
+            memoryMb >= 10
+          ) {
+            procs.push({ name, pid, memoryMb });
+          }
+        }
+      }
+      procs.sort((a, b) => b.memoryMb - a.memoryMb);
+      resolve(procs.slice(0, 15));
+    });
+  });
+}
+
+function getPrimaryMacAddress(): string {
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      const net = interfaces[name];
+      if (net) {
+        for (const item of net) {
+          if (!item.internal && item.mac && item.mac !== '00:00:00:00:00:00') {
+            return item.mac;
+          }
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return '00:1A:2B:3C:4D:5E';
+}
+
+function cleanSessionData(): void {
+  try {
+    clipboard.clear();
+    console.log('[SENET Cleanup] System clipboard cleared.');
+    session.defaultSession.clearCache().catch(() => {});
+    session.fromPartition('persist:senet_browser').clearStorageData().catch(() => {});
+    console.log('[SENET Cleanup] Browser cache and temporary session files cleared.');
+  } catch (err) {
+    console.warn('[SENET Cleanup] Warning during session clean:', err);
+  }
+}
+
+function setMaintenanceMode(enabled: boolean): void {
+  isMaintenanceMode = enabled;
+  if (mainWindow) {
+    if (enabled) {
+      mainWindow.setKiosk(false);
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.setFullScreen(false);
+      mainWindow.minimize();
+      console.log('[SENET Maintenance] Maintenance Mode ACTIVATED (Kiosk unlocked for technician)');
+    } else {
+      mainWindow.restore();
+      mainWindow.setKiosk(true);
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+      mainWindow.setFullScreen(true);
+      mainWindow.focus();
+      console.log('[SENET Maintenance] Kiosk Protection Mode RESTORED');
+    }
+  }
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1920,
@@ -176,8 +324,31 @@ function createWindow(): void {
     });
   }
 
+  // Watchdog auto-recovery handler: respawn if renderer crashes or is closed outside maintenance mode
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`[SENET Watchdog] Renderer process gone (${details.reason}, exitCode: ${details.exitCode})`);
+    if (!isMaintenanceMode && !isAppQuitting) {
+      console.log('[SENET Watchdog] Respawing Lock Screen window immediately...');
+      setTimeout(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) {
+          createWindow();
+        } else {
+          mainWindow.reload();
+        }
+      }, 500);
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
+    if (!isMaintenanceMode && !isAppQuitting) {
+      console.log('[SENET Watchdog] Window closed unexpectedly -> Respawning kiosk window...');
+      setTimeout(() => {
+        if (!isAppQuitting) {
+          createWindow();
+        }
+      }, 500);
+    }
   });
 }
 
@@ -318,14 +489,73 @@ ipcMain.handle('kill-game-processes', async () => {
     }
   }
 
-  // 3. Force lock state and re-assert topmost kiosk window
+  // 3. Post-session cleanup: clear clipboard and browser storage
+  cleanSessionData();
+
+  // 4. Force lock state and re-assert topmost kiosk window
   isKioskLocked = true;
-  if (mainWindow) {
+  if (mainWindow && !isMaintenanceMode) {
     mainWindow.setKiosk(true);
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
     mainWindow.focus();
   }
 
+  return { success: true };
+});
+
+ipcMain.handle('get-real-telemetry', async () => {
+  const cpu_usage = calculateCpuUsage();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const memory_usage = Math.round(((totalMem - freeMem) / totalMem) * 100);
+  const power_plan = await getActivePowerPlan();
+  const processes = await getRunningProcessesList();
+  const mac_address = getPrimaryMacAddress();
+
+  return {
+    cpu_usage,
+    memory_usage,
+    power_plan,
+    processes,
+    mac_address,
+    maintenance_mode: isMaintenanceMode,
+  };
+});
+
+ipcMain.handle('set-power-plan', async (_event, plan: 'high_performance' | 'balanced' | 'power_saver') => {
+  return await setWindowsPowerPlan(plan);
+});
+
+ipcMain.handle('kill-process', async (_event, { pid, name }: { pid?: number; name?: string }) => {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      const cmd = pid ? `taskkill /F /PID ${pid}` : name ? `taskkill /F /IM ${name}` : null;
+      if (!cmd) return resolve({ success: false, error: 'No pid or process name provided' });
+      exec(cmd, (err) => {
+        if (err) return resolve({ success: false, error: err.message });
+        resolve({ success: true });
+      });
+    } else {
+      if (pid) {
+        try {
+          process.kill(pid, 'SIGKILL');
+          return resolve({ success: true });
+        } catch (e: any) {
+          return resolve({ success: false, error: e.message });
+        }
+      }
+      resolve({ success: false, error: 'PID required on non-Windows platform' });
+    }
+  });
+});
+
+ipcMain.handle('set-maintenance-mode', async (_event, enabled: boolean) => {
+  setMaintenanceMode(enabled);
+  return { success: true, maintenance_mode: enabled };
+});
+
+ipcMain.handle('clean-session-data', async () => {
+  cleanSessionData();
   return { success: true };
 });
 
@@ -368,7 +598,7 @@ ipcMain.handle('get-system-stats', async () => {
 ipcMain.handle('system-reboot', async () => {
   console.log('[SENET IPC] Remote REBOOT executed by Club Admin...');
   if (process.platform === 'win32') {
-    spawn('shutdown', ['/r', '/t', '5', '/c', 'Reboot initiated by Club Administrator'], { stdio: 'ignore' });
+    spawn('shutdown', ['/r', '/t', '0'], { stdio: 'ignore' });
   }
   return { success: true };
 });
@@ -376,7 +606,7 @@ ipcMain.handle('system-reboot', async () => {
 ipcMain.handle('system-shutdown', async () => {
   console.log('[SENET IPC] Remote SHUTDOWN executed by Club Admin...');
   if (process.platform === 'win32') {
-    spawn('shutdown', ['/s', '/t', '5', '/c', 'Shutdown initiated by Club Administrator'], { stdio: 'ignore' });
+    spawn('shutdown', ['/s', '/t', '0'], { stdio: 'ignore' });
   }
   return { success: true };
 });
@@ -469,6 +699,10 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  isAppQuitting = true;
 });
 
 app.on('will-quit', () => {

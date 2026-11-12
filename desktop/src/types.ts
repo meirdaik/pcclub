@@ -19,7 +19,7 @@ export interface ServerMessage {
 }
 
 export interface ClientMessage {
-  type: 'auth' | 'heartbeat' | 'status' | 'call_admin' | 'order_snack' | 'clear_alert';
+  type: 'auth' | 'heartbeat' | 'status' | 'call_admin' | 'order_snack' | 'clear_alert' | 'chat_message';
   token?: string;
   pc_id?: string;
   status?: string;
@@ -27,9 +27,19 @@ export interface ClientMessage {
   active_game?: string;
   current_user?: string;
   message?: string;
+  text?: string;
+  sender?: string;
   description?: string;
   timestamp?: number;
   [key: string]: unknown;
+}
+
+export interface ChatMessage {
+  id: string;
+  pc_id: string;
+  sender: string;
+  text: string;
+  timestamp: number;
 }
 
 export interface GameItem {
@@ -117,6 +127,18 @@ export interface ElectronAPI {
   setKioskMode: (enabled: boolean) => void;
   setKioskLocked: (locked: boolean) => void;
   killGameProcesses: () => Promise<{ success: boolean }>;
+  getRealTelemetry?: () => Promise<{
+    cpu_usage: number;
+    memory_usage: number;
+    power_plan: string;
+    processes: Array<{ name: string; pid: number; memoryMb: number }>;
+    mac_address: string;
+    maintenance_mode: boolean;
+  }>;
+  setPowerPlan?: (plan: string) => Promise<{ success: boolean; plan: string; message: string }>;
+  killProcess?: (payload: { pid?: number; name?: string }) => Promise<{ success: boolean; error?: string }>;
+  setMaintenanceMode?: (enabled: boolean) => Promise<{ success: boolean; maintenance_mode: boolean }>;
+  cleanSessionData?: () => Promise<{ success: boolean }>;
   openExternal: (url: string) => void;
   systemReboot?: () => Promise<{ success: boolean }>;
   systemShutdown?: () => Promise<{ success: boolean }>;

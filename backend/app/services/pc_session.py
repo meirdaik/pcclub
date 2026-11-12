@@ -20,6 +20,7 @@ class PcSessionManager:
         self._connections: dict[str, WebSocket] = {}
         self._aliases: dict[str, str] = {}
         self._telemetry: dict[str, dict[str, Any]] = {}
+        self._chat_messages: list[dict[str, Any]] = []
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -119,6 +120,16 @@ class PcSessionManager:
             await self.disconnect(target_id)
             return False
 
+    async def broadcast_command(
+        self, action: str, data: dict[str, Any] | None = None
+    ) -> int:
+        """Send a JSON command to ALL connected PC kiosk clients."""
+        dispatched = 0
+        for pc_id in list(self._connections.keys()):
+            if await self.send_command(pc_id, action, data):
+                dispatched += 1
+        return dispatched
+
     # ------------------------------------------------------------------
     # Telemetry & Heartbeat Registry
     # ------------------------------------------------------------------
@@ -153,6 +164,61 @@ class PcSessionManager:
             existing["current_user"] = data["current_user"]
         if "alert" in data:
             existing["alert"] = data["alert"]
+        for key in (
+            "cpu_usage",
+            "memory_usage",
+            "gpu_usage",
+            "power_plan",
+            "processes",
+            "mac_address",
+            "maintenance_mode",
+            "specs",
+        ):
+            if key in data:
+                existing[key] = data[key]
+
+    @staticmethod
+    def send_wake_on_lan(mac_address: str, broadcast_ip: str = "255.255.255.255", port: int = 9) -> bool:
+        """Send a Wake-on-LAN magic packet to power on a remote PC via network."""
+        import socket
+
+        try:
+            clean_mac = mac_address.replace(":", "").replace("-", "").strip()
+            if len(clean_mac) != 12:
+                logger.warning("Invalid MAC address for WoL: %s", mac_address)
+                return False
+            mac_bytes = bytes.fromhex(clean_mac)
+            magic_packet = b"\xff" * 6 + mac_bytes * 16
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.sendto(magic_packet, (broadcast_ip, port))
+            logger.info("Wake-on-LAN packet dispatched to MAC %s", mac_address)
+            return True
+        except Exception as exc:
+            logger.error("Failed to send WoL packet to %s: %s", mac_address, exc)
+            return False
+
+    def add_chat_message(self, pc_id: str, sender: str, text: str) -> dict[str, Any]:
+        """Record a chat message between admin and station."""
+        target = self._aliases.get(pc_id, pc_id)
+        msg = {
+            "id": f"msg-{int(time.time() * 1000)}",
+            "pc_id": target,
+            "sender": sender,
+            "text": text,
+            "timestamp": time.time(),
+        }
+        self._chat_messages.append(msg)
+        if len(self._chat_messages) > 200:
+            self._chat_messages = self._chat_messages[-200:]
+        return msg
+
+    def get_chat_messages(self, pc_id: str | None = None) -> list[dict[str, Any]]:
+        """Return chat messages for a specific station or all stations."""
+        if not pc_id or pc_id == "ALL":
+            return list(self._chat_messages)
+        target = self._aliases.get(pc_id, pc_id)
+        return [m for m in self._chat_messages if m["pc_id"] == target]
 
     def set_alert(self, pc_id: str, alert_message: str) -> None:
         target = self._aliases.get(pc_id, pc_id)

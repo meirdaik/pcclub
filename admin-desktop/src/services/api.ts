@@ -148,6 +148,164 @@ class AdminApiClient {
     }
     return false;
   }
+
+  async setPowerPlan(pcId: string, plan: 'high_performance' | 'balanced' | 'power_saver'): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/power-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async killProcess(pcId: string, payload: { pid?: number; name?: string }): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/kill-process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async launchApp(pcId: string, path: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/launch-app`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async setMaintenanceMode(pcId: string, enabled: boolean): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/maintenance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async wakeOnLan(pcId: string, macAddress: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/wake-on-lan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac_address: macAddress }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async broadcastToPc(pcId: string, message: string, title = 'Admin Notification'): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, title }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async broadcastToAll(message: string, title = 'Club Broadcast'): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/broadcast-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, title }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchChat(pcId?: string): Promise<any[]> {
+    try {
+      const url = pcId ? `${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/chat` : `${this.baseUrl}/api/admin/chat`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return res.json();
+    } catch {
+      return [];
+    }
+  }
+
+  async sendChat(pcId: string, message: string, sender = 'Admin'): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/pc/${encodeURIComponent(pcId)}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, sender }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchOrders(): Promise<any[]> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/orders`);
+      if (!res.ok) return [];
+      return res.json();
+    } catch {
+      return [];
+    }
+  }
+
+  async updateOrderStatus(orderId: string, status: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchShiftCurrent(): Promise<any> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/admin/shift/current`);
+      if (!res.ok) return null;
+      return res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  async closeShift(cashierName?: string, notes?: string): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/api/admin/shift/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cashier_name: cashierName, notes }),
+    });
+    if (!res.ok) throw new Error('Failed to close shift');
+    return res.json();
+  }
 }
 
 export const api = new AdminApiClient();
