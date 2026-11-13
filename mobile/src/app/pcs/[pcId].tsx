@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -28,8 +28,15 @@ import {
 import { addDays, dateKey, formatTime, parseInstant, toZoned } from '@/lib/time';
 import { useLoad } from '@/lib/useLoad';
 import { useNow } from '@/lib/useNow';
-import { Button, Chip, Loadable, Notice, Screen } from '@/ui/components';
-import { colors, font, radius, space } from '@/ui/theme';
+import { Button, Chip, Header, Loadable, Notice, Screen } from '@/ui/components';
+import { GUTTER, colors, space, type } from '@/ui/theme';
+
+/** Text styles of this older picker, expressed in the new type scale. */
+const font = {
+  small: { ...type.body, color: colors.muted },
+  heading: type.label,
+  body: type.body,
+};
 
 /** What the package covers, e.g. "3 ч от выбранного начала." */
 function describePackage(item: Package): string {
@@ -111,9 +118,7 @@ export default function BookPcScreen() {
 
   return (
     <Screen>
-      <Stack.Screen
-        options={{ title: base.data ? t.booking.title(base.data.pc.label) : '' }}
-      />
+      <Header back={t.packages.back} right={base.data ? t.booking.title(base.data.pc.label) : undefined} />
       <Loadable state={base}>
         {({ club, pc, packages }) => {
           const zone = club.timezone;
@@ -146,7 +151,7 @@ export default function BookPcScreen() {
           const inPast = selection !== null && selection.start <= now;
 
           return (
-            <>
+            <View style={styles.page}>
               <Text style={font.small}>
                 {pc.zone_name} · {formatKzt(pc.price_per_hour_kzt)} {t.common.perHour}
               </Text>
@@ -284,7 +289,7 @@ export default function BookPcScreen() {
                   if (selection) void submit(selection.start);
                 }}
               />
-            </>
+            </View>
           );
         }}
       </Loadable>
@@ -293,16 +298,16 @@ export default function BookPcScreen() {
 }
 
 const styles = StyleSheet.create({
+  page: { padding: GUTTER, gap: space.md },
   dayRow: { gap: space.sm, paddingVertical: space.xs },
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  inRange: { borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  inRange: { backgroundColor: colors.selected },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
   duration: { ...font.heading, minWidth: 110, textAlign: 'center' },
   summary: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.lineStrong,
     padding: space.lg,
     gap: space.xs,
   },

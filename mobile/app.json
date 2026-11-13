@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "PC Club",
+    "name": "Clutch",
     "slug": "pcclub",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,10 +11,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0A0A10",
+        "foregroundImage": "./assets/clutch-logo.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -25,11 +23,29 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Clutch uses the camera to scan the QR code on a club PC."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Clutch uses your location to show clubs near you."
+        }
+      ]
     ],
     "scheme": "pcclub",
     "experiments": {
       "typedRoutes": true
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A10"
     }
   }
 }

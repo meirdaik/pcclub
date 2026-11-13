@@ -45,8 +45,17 @@ export const getClub = (clubId: string) =>
 export const listZones = (clubId: string) =>
   api<Zone[]>('GET', `/v1/clubs/${clubId}/zones`, { auth: false });
 
-export const listPcs = (clubId: string) =>
-  api<Pc[]>('GET', `/v1/clubs/${clubId}/pcs`, { auth: false });
+/**
+ * Bookable PCs of a club. With a window (epoch ms), each PC carries `available`: true when no
+ * booking or unexpired hold overlaps it. That flag is the live seat status.
+ */
+export const listPcs = (clubId: string, window?: { from: number; to: number }) =>
+  api<Pc[]>('GET', `/v1/clubs/${clubId}/pcs`, {
+    query: window
+      ? { from: new Date(window.from).toISOString(), to: new Date(window.to).toISOString() }
+      : undefined,
+    auth: false,
+  });
 
 /**
  * Fixed-price packages of a club (optionally of one zone). Book one by sending its id as

@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { View } from 'react-native';
 
 import { submitIdentity } from '@/api/endpoints';
 import { useAuth } from '@/auth/AuthContext';
 import { errorMessage, t } from '@/i18n';
 import { isValidIin } from '@/lib/iin';
 import { Button, Field, Notice, Screen } from '@/ui/components';
-import { useTheme } from '@/ui/theme';
+import { GUTTER, colors } from '@/ui/theme';
+import { Logo } from '@/ui/navicons';
+import { T } from '@/ui/type';
 
 /**
  * IIN verification. The local check only catches typos; the server asks the identity registry
@@ -14,7 +16,6 @@ import { useTheme } from '@/ui/theme';
  */
 export default function IdentityScreen() {
   const { setUser, signOut } = useAuth();
-  const { font } = useTheme();
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [iin, setIin] = useState('');
@@ -48,36 +49,45 @@ export default function IdentityScreen() {
 
   return (
     <Screen>
-      <Text style={font.body}>{t.identity.subtitle}</Text>
-      <Field
-        label={t.identity.lastName}
-        value={lastName}
-        onChangeText={setLastName}
-        autoComplete="family-name"
-        textContentType="familyName"
-        autoCapitalize="words"
-      />
-      <Field
-        label={t.identity.firstName}
-        value={firstName}
-        onChangeText={setFirstName}
-        autoComplete="given-name"
-        textContentType="givenName"
-        autoCapitalize="words"
-      />
-      <Field
-        label={t.identity.iin}
-        value={iin}
-        onChangeText={(value) => setIin(value.replace(/\D/g, '').slice(0, 12))}
-        placeholder={t.identity.iinHint}
-        keyboardType="number-pad"
-        autoComplete="off"
-        maxLength={12}
-        error={iinError}
-      />
-      {error ? <Notice>{error}</Notice> : null}
-      <Button title={t.identity.submit} onPress={() => void submit()} loading={busy} />
-      <Button title={t.common.signOut} variant="link" onPress={() => void signOut()} />
+      <View style={{ padding: GUTTER, gap: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Logo size={32} />
+          <T v="wordmark">{t.clubs.wordmark}</T>
+        </View>
+        <T v="title">{t.identity.title}</T>
+        <T v="body" color={colors.muted}>
+          {t.identity.subtitle}
+        </T>
+        <Field
+          label={t.identity.lastName}
+          value={lastName}
+          onChangeText={setLastName}
+          autoComplete="family-name"
+          textContentType="familyName"
+          autoCapitalize="words"
+        />
+        <Field
+          label={t.identity.firstName}
+          value={firstName}
+          onChangeText={setFirstName}
+          autoComplete="given-name"
+          textContentType="givenName"
+          autoCapitalize="words"
+        />
+        <Field
+          label={t.identity.iin}
+          value={iin}
+          onChangeText={(value) => setIin(value.replace(/\D/g, '').slice(0, 12))}
+          placeholder={t.identity.iinHint}
+          keyboardType="number-pad"
+          autoComplete="off"
+          maxLength={12}
+          error={iinError}
+        />
+        {error ? <Notice>{error}</Notice> : null}
+        <Button title={t.identity.submit} arrow onPress={() => void submit()} loading={busy} />
+        <Button title={t.common.signOut} variant="link" onPress={() => void signOut()} />
+      </View>
     </Screen>
   );
 }
